@@ -1,19 +1,38 @@
 package main
 
-import "io"
+import (
+	"fmt"
+	nurl "net/url"
+	"strings"
+)
 
-// StartObelisk starts archival process for HTML page.
+// Start starts archival process for web page.
 // It returns a single HTML file which embed its assets as base64.
-func StartObelisk(r io.Reader) {
-	// Parse input into HTML document
+func Start(sourceURL string, dstPath string) error {
+	// Make sure source URL valid
+	url, err := nurl.ParseRequestURI(sourceURL)
+	if err != nil || url.Scheme == "" || url.Hostname() == "" {
+		return fmt.Errorf("url \"%s\" is not valid", sourceURL)
+	}
 
-	// Prepare documents by doing following steps :
-	// - Replace lazy loaded image with image from its <noscript> counterpart.
-	// - Replace `data-src` and `data-srcset` attribute to `src` and `srcset`.
-	// - Convert relative URL into absolute URL.
-	// - Remove all <script> and <noscript>. We don't want to use any JS.
-	// - Remove all comments from document.
-	// All these steps is available in go-readability, so we can reuse them here.
+	// Download page from source URL
+	resp, err := downloadFile(url.String(), "")
+	if err != nil {
+		return fmt.Errorf("download failed: %w", err)
+	}
+	defer resp.Body.Close()
 
-	// Find all resources from nodes attribute or inline CSS, then embed it.
+	// Check the type of the downloaded file.
+	// If it's not HTML, just save it as it is to storage.
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "text/html") {
+		err = saveToFile(resp.Body, dstPath)
+		if err != nil {
+			return fmt.Errorf("failed to save file: %w", err)
+		}
+
+		return nil
+	}
+
+	return nil
 }
