@@ -5,7 +5,12 @@ import (
 	nurl "net/url"
 	"os"
 	fp "path/filepath"
+	"regexp"
 	"strings"
+)
+
+var (
+	rxStyleURL = regexp.MustCompile(`(?i)^url\((.+)\)$`)
 )
 
 // saveToFile saves an input into specified path
@@ -30,15 +35,25 @@ func saveToFile(input io.Reader, dstPath string) error {
 }
 
 // createAbsoluteURL convert url to absolute path based on base.
-// However, if url is prefixed with hash (#), the url won't be changed.
 func createAbsoluteURL(url string, base *nurl.URL) string {
+	url = strings.TrimSpace(url)
 	if url == "" || base == nil {
 		return ""
 	}
 
-	// If it is hash tag, return as it is
+	// If it is data url, return as it is
+	if strings.HasPrefix(url, "data:") {
+		return url
+	}
+
+	// If it is fragment path, return as it is
 	if strings.HasPrefix(url, "#") {
 		return url
+	}
+
+	// If it is javascript url, return as hash
+	if strings.HasPrefix(url, "javascript:") {
+		return "#"
 	}
 
 	// If it is already an absolute URL, clean the URL then return it
@@ -70,4 +85,21 @@ func cleanURL(url *nurl.URL) {
 
 	url.Fragment = ""
 	url.RawQuery = queries.Encode()
+}
+
+// sanitizeStyleURL sanitizes the URL in CSS by removing `url()`,
+// quotation mark and trailing slash
+func sanitizeStyleURL(url string) string {
+	cssURL := rxStyleURL.ReplaceAllString(url, "$1")
+	cssURL = strings.TrimSpace(cssURL)
+
+	if strings.HasPrefix(cssURL, `"`) {
+		return strings.Trim(cssURL, `"`)
+	}
+
+	if strings.HasPrefix(cssURL, `'`) {
+		return strings.Trim(cssURL, `'`)
+	}
+
+	return cssURL
 }

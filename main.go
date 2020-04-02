@@ -1,9 +1,13 @@
 package main
 
-const sourceURL = "https://github.com/RadhiFadlillah/duit"
+import "context"
+
+const sourceURL = "https://kotaku.com/the-spectacular-story-of-metroid-one-of-gamings-riche-1284029577"
 
 func main() {
-	// Check the type of the downloaded file.
-	// If it's not HTML, save it as it is to storage.
-	// If it's HTML, it's time to use Obelisk.
+	arc := NewArchiver()
+	err := arc.Start(context.Background(), sourceURL, "kotaku.html")
+	if err != nil {
+		panic(err)
+	}
 }
