@@ -29,6 +29,7 @@ func (arc *Archiver) processURL(ctx context.Context, url string) (string, error)
 	arc.RUnlock()
 
 	if exist {
+		log.Println("(CACHE)", url)
 		return cache, nil
 	}
 
