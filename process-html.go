@@ -42,9 +42,8 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	// Find all nodes which might has subresource.
 	// A node might has subresource if it fulfills one of these criterias :
 	// - It has inline style;
-	// - It's tag name is meta, and it contains link to image for social media.
-	// - It's tag name is either style, img, picture, figure, video, audio, source,
-	//   link, iframe or object;
+	// - It's link for icon or stylesheets;
+	// - It's tag name is either style, img, picture, figure, video, audio, source, iframe or object;
 	resourceNodes := make(map[*html.Node]struct{})
 	for _, node := range dom.GetElementsByTagName(doc, "*") {
 		if style := dom.GetAttribute(node, "style"); strings.TrimSpace(style) != "" {
@@ -53,7 +52,13 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 		}
 
 		switch dom.TagName(node) {
-		case "link", "iframe", "embed", "object", "style",
+		case "link":
+			rel := dom.GetAttribute(node, "rel")
+			if strings.Contains(rel, "icon") || strings.Contains(rel, "stylesheet") {
+				resourceNodes[node] = struct{}{}
+			}
+
+		case "iframe", "embed", "object", "style",
 			"img", "picture", "figure", "video", "audio", "source":
 			resourceNodes[node] = struct{}{}
 		}
