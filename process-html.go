@@ -16,6 +16,7 @@ import (
 var (
 	rxImageSrcAttr    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp)\S*\s*$`)
 	rxImageSrcsetAttr = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)\s+\d`)
+	rxImageSrcsetURL  = regexp.MustCompile(`(?i)(\S+)(\s+\d+[xw])?,?`)
 )
 
 func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
@@ -154,24 +155,21 @@ func (arc *Archiver) processMediaNode(ctx context.Context, node *html.Node) erro
 		return nil
 	}
 
+	var newSets []string
 	srcset := dom.GetAttribute(node, "srcset")
-	sets := strings.Split(srcset, ",")
-	for i, set := range sets {
-		set = strings.TrimSpace(set)
-		parts := strings.SplitN(set, " ", 2)
-		if parts[0] == "" {
-			continue
-		}
-
-		parts[0], err = arc.processURL(ctx, parts[0])
+	for _, parts := range rxImageSrcsetURL.FindAllStringSubmatch(srcset, -1) {
+		oldURL := parts[1]
+		targetWidth := parts[2]
+		newSet, err := arc.processURL(ctx, oldURL)
 		if err != nil {
 			return err
 		}
 
-		sets[i] = strings.Join(parts, " ")
+		newSet += targetWidth
+		newSets = append(newSets, newSet)
 	}
 
-	newSrcset := strings.Join(sets, ",")
+	newSrcset := strings.Join(newSets, ",")
 	dom.SetAttribute(node, "srcset", newSrcset)
 	return nil
 }
@@ -346,20 +344,18 @@ func (arc *Archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 			continue
 		}
 
+		var newSets []string
 		srcset := dom.GetAttribute(media, "srcset")
-		sets := strings.Split(srcset, ",")
-		for i, set := range sets {
-			set = strings.TrimSpace(set)
-			parts := strings.SplitN(set, " ", 2)
-			if parts[0] == "" {
-				continue
-			}
+		for _, parts := range rxImageSrcsetURL.FindAllStringSubmatch(srcset, -1) {
+			oldURL := parts[1]
+			targetWidth := parts[2]
 
-			parts[0] = createAbsoluteURL(parts[0], baseURL)
-			sets[i] = strings.Join(parts, " ")
+			newSet := createAbsoluteURL(oldURL, baseURL)
+			newSet += targetWidth
+			newSets = append(newSets, newSet)
 		}
 
-		newSrcset := strings.Join(sets, ",")
+		newSrcset := strings.Join(newSets, ",")
 		dom.SetAttribute(media, "srcset", newSrcset)
 	}
 }
