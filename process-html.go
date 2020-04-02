@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	rxImageDataSrcset = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)\s+\d`)
-	rxImageDataSrc    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp)\S*\s*$`)
+	rxImageSrcAttr    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp)\S*\s*$`)
+	rxImageSrcsetAttr = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)\s+\d`)
 )
 
 func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
@@ -240,6 +240,36 @@ func (arc *Archiver) convertLazyImageAttrs(doc *html.Node) {
 		nodeTag := dom.TagName(elem)
 		nodeClass := dom.ClassName(elem)
 
+		// In some sites (e.g. Kotaku), they put 1px square image as data uri in
+		// the src attribute. So, here we check if the data uri is too short,
+		// just might as well remove it.
+		if src != "" && strings.HasPrefix(src, "data:") {
+			// I don't have any source but I guess if image is less
+			// than 100 bytes it will be too small, therefore it might
+			// be placeholder image. With that said, I will use 100B
+			// as threshold (or 133B after encoded to base64).
+			b64starts := strings.Index(src, "base64,") + 7
+			b64length := len(src) - b64starts
+			if b64length < 133 {
+				src = ""
+				dom.RemoveAttribute(elem, "src")
+			}
+		}
+
+		// Some websites store their resource for lazy-loaded image in data- attributes
+		// (e.g. websites that uses LazyLoad library), so here we try to move it.
+		if dataSrc := dom.GetAttribute(elem, "data-src"); dataSrc != "" {
+			src = dataSrc
+			dom.SetAttribute(elem, "src", dataSrc)
+			dom.RemoveAttribute(elem, "data-src")
+		}
+
+		if dataSrcset := dom.GetAttribute(elem, "data-srcset"); dataSrcset != "" {
+			srcset = dataSrcset
+			dom.SetAttribute(elem, "srcset", dataSrcset)
+			dom.RemoveAttribute(elem, "data-srcset")
+		}
+
 		if (src != "" || srcset != "") && !strings.Contains(strings.ToLower(nodeClass), "lazy") {
 			continue
 		}
@@ -250,9 +280,9 @@ func (arc *Archiver) convertLazyImageAttrs(doc *html.Node) {
 			}
 
 			copyTo := ""
-			if rxImageDataSrcset.MatchString(attr.Val) {
+			if rxImageSrcsetAttr.MatchString(attr.Val) {
 				copyTo = "srcset"
-			} else if rxImageDataSrc.MatchString(attr.Val) {
+			} else if rxImageSrcAttr.MatchString(attr.Val) {
 				copyTo = "src"
 			}
 
