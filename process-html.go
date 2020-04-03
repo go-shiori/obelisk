@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	rxImageSrcAttr    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp)\S*\s*$`)
-	rxImageSrcsetAttr = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)\s+\d`)
+	rxImgExtensions   = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)`)
+	rxLazyImageSrc    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp)\S*\s*$`)
+	rxLazyImageSrcset = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)\s+\d`)
 	rxImageSrcsetURL  = regexp.MustCompile(`(?i)(\S+)(\s+\d+[xw])?,?`)
 )
 
@@ -174,57 +175,80 @@ func (arc *Archiver) processMediaNode(ctx context.Context, node *html.Node) erro
 	return nil
 }
 
-// replaceLazyImage find all <noscript> that located after <img> node,
-// and contains exactly single <img> element. Once it found, this method
-// will replace the previous <img> with <img> inside <noscript>, then finally
-// remove the <noscript> tag. This is done because in some website (e.g. Medium),
-// they use lazy load method like this.
-// This is ADDITIONAL and doesn't exist yet in readability.js.
+// replaceLazyImage finds all <noscript> that are located after <img> nodes,
+// and which contain only one <img> element. Replace the first image with
+// the image from inside the <noscript> tag, and remove the <noscript> tag.
+// This improves the quality of the images we use on some sites (e.g. Medium).
 func (arc *Archiver) replaceLazyImage(doc *html.Node) {
-	// First, find div which only contains single img element, then put it out.
-	for _, div := range dom.GetElementsByTagName(doc, "div") {
-		if children := dom.Children(div); len(children) == 1 && dom.TagName(children[0]) == "img" {
-			dom.ReplaceChild(div.Parent, children[0], div)
-		}
-	}
-
-	// Next find img without source, and remove it. This is done to
-	// prevent a placeholder img is replaced by img from noscript in next step.
+	// Find img without source or attributes that might contains image, and
+	// remove it. This is done to prevent a placeholder img is replaced by
+	// img from noscript in next step.
 	for _, img := range dom.GetElementsByTagName(doc, "img") {
-		src := dom.GetAttribute(img, "src")
-		srcset := dom.GetAttribute(img, "srcset")
-		dataSrc := dom.GetAttribute(img, "data-src")
-		dataSrcset := dom.GetAttribute(img, "data-srcset")
+		needToBeRemoved := true
+		for _, attr := range img.Attr {
+			switch attr.Key {
+			case "src", "data-src", "srcset", "data-srcset":
+				needToBeRemoved = false
+				break
+			}
 
-		if src == "" && srcset == "" && dataSrc == "" && dataSrcset == "" {
+			if rxImgExtensions.MatchString(attr.Val) {
+				needToBeRemoved = false
+				break
+			}
+		}
+
+		if needToBeRemoved {
 			img.Parent.RemoveChild(img)
 		}
 	}
 
 	// Next find noscript and try to extract its image
 	for _, noscript := range dom.GetElementsByTagName(doc, "noscript") {
-		// Make sure prev sibling is exist and it's image
-		prevElement := dom.PreviousElementSibling(noscript)
-		if dom.TagName(prevElement) != "img" {
-			continue
-		}
-
-		// In Go content of noscript is treated as string, so here we parse it.
+		// Parse content of noscript and make sure it only contains image
 		noscriptContent := dom.TextContent(noscript)
 		tmpDoc, err := html.Parse(strings.NewReader(noscriptContent))
 		if err != nil {
 			continue
 		}
 
-		// Make sure noscript only has one children, and it's <img> element
 		tmpBody := dom.GetElementsByTagName(tmpDoc, "body")[0]
-		children := dom.Children(tmpBody)
-		if len(children) != 1 || dom.TagName(children[0]) != "img" {
+		if !arc.isSingleImage(tmpBody) {
 			continue
 		}
 
-		// At this point, just replace the previous img with img from noscript
-		dom.ReplaceChild(noscript.Parent, children[0], prevElement)
+		// If noscript has previous sibling and it only contains image,
+		// replace it with noscript content. However we also keep old
+		// attributes that might contains image.
+		prevElement := dom.PreviousElementSibling(noscript)
+		if prevElement != nil && arc.isSingleImage(prevElement) {
+			prevImg := prevElement
+			if dom.TagName(prevImg) != "img" {
+				prevImg = dom.GetElementsByTagName(prevElement, "img")[0]
+			}
+
+			newImg := dom.GetElementsByTagName(tmpBody, "img")[0]
+			for _, attr := range prevImg.Attr {
+				if attr.Val == "" {
+					continue
+				}
+
+				if attr.Key == "src" || attr.Key == "srcset" || rxImgExtensions.MatchString(attr.Val) {
+					if dom.GetAttribute(newImg, attr.Key) == attr.Val {
+						continue
+					}
+
+					attrName := attr.Key
+					if dom.HasAttribute(newImg, attrName) {
+						attrName = "data-old-" + attrName
+					}
+
+					dom.SetAttribute(newImg, attrName, attr.Val)
+				}
+			}
+
+			dom.ReplaceChild(noscript.Parent, dom.FirstElementChild(tmpBody), prevElement)
+		}
 	}
 }
 
@@ -278,9 +302,9 @@ func (arc *Archiver) convertLazyImageAttrs(doc *html.Node) {
 			}
 
 			copyTo := ""
-			if rxImageSrcsetAttr.MatchString(attr.Val) {
+			if rxLazyImageSrcset.MatchString(attr.Val) {
 				copyTo = "srcset"
-			} else if rxImageSrcAttr.MatchString(attr.Val) {
+			} else if rxLazyImageSrc.MatchString(attr.Val) {
 				copyTo = "src"
 			}
 
@@ -395,4 +419,20 @@ func (arc *Archiver) removeComments(doc *html.Node) {
 
 	// Remove it
 	dom.RemoveNodes(comments, nil)
+}
+
+// isSingleImage checks if node is image, or if node contains exactly
+// only one image whether as a direct child or as its descendants.
+func (arc *Archiver) isSingleImage(node *html.Node) bool {
+	if dom.TagName(node) == "img" {
+		return true
+	}
+
+	children := dom.Children(node)
+	textContent := dom.TextContent(node)
+	if len(children) != 1 || strings.TrimSpace(textContent) != "" {
+		return false
+	}
+
+	return arc.isSingleImage(children[0])
 }
