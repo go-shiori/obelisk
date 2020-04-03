@@ -1,4 +1,4 @@
-package main
+package obelisk
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (arc *Archiver) processCSS(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
+func (arc *archiver) processCSS(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
 	// Prepare buffer to store content from input
 	buffer := bytes.NewBuffer(nil)
 

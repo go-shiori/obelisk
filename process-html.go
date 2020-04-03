@@ -1,4 +1,4 @@
-package main
+package obelisk
 
 import (
 	"context"
@@ -20,7 +20,7 @@ var (
 	rxImageSrcsetURL  = regexp.MustCompile(`(?i)(\S+)(\s+\d+[xw])?,?`)
 )
 
-func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
+func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
 	// Parse input into HTML document
 	doc, err := html.Parse(input)
 	if err != nil {
@@ -107,7 +107,7 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	return docHTML, nil
 }
 
-func (arc *Archiver) processStyleAttr(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+func (arc *archiver) processStyleAttr(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
 	style := dom.GetAttribute(node, "style")
 	newStyle, err := arc.processCSS(ctx, strings.NewReader(style), baseURL)
 	if err == nil {
@@ -117,7 +117,7 @@ func (arc *Archiver) processStyleAttr(ctx context.Context, node *html.Node, base
 	return err
 }
 
-func (arc *Archiver) processStyleNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+func (arc *archiver) processStyleNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
 	style := dom.TextContent(node)
 	newStyle, err := arc.processCSS(ctx, strings.NewReader(style), baseURL)
 	if err == nil {
@@ -127,7 +127,7 @@ func (arc *Archiver) processStyleNode(ctx context.Context, node *html.Node, base
 	return err
 }
 
-func (arc *Archiver) processURLNode(ctx context.Context, node *html.Node, attrName string) error {
+func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrName string) error {
 	if !dom.HasAttribute(node, attrName) {
 		return nil
 	}
@@ -141,7 +141,7 @@ func (arc *Archiver) processURLNode(ctx context.Context, node *html.Node, attrNa
 	return err
 }
 
-func (arc *Archiver) processMediaNode(ctx context.Context, node *html.Node) error {
+func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node) error {
 	err := arc.processURLNode(ctx, node, "src")
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func (arc *Archiver) processMediaNode(ctx context.Context, node *html.Node) erro
 // and which contain only one <img> element. Replace the first image with
 // the image from inside the <noscript> tag, and remove the <noscript> tag.
 // This improves the quality of the images we use on some sites (e.g. Medium).
-func (arc *Archiver) replaceLazyImage(doc *html.Node) {
+func (arc *archiver) replaceLazyImage(doc *html.Node) {
 	// Find img without source or attributes that might contains image, and
 	// remove it. This is done to prevent a placeholder img is replaced by
 	// img from noscript in next step.
@@ -255,7 +255,7 @@ func (arc *Archiver) replaceLazyImage(doc *html.Node) {
 // convertLazyImageAttrs convert attributes data-src and data-srcset
 // which often found in lazy-loaded images and pictures, into basic attribute
 // src and srcset, so images that can be loaded without JS.
-func (arc *Archiver) convertLazyImageAttrs(doc *html.Node) {
+func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
 	for _, elem := range dom.GetAllNodesWithTag(doc, "img", "picture", "figure") {
 		src := dom.GetAttribute(elem, "src")
 		srcset := dom.GetAttribute(elem, "srcset")
@@ -331,7 +331,7 @@ func (arc *Archiver) convertLazyImageAttrs(doc *html.Node) {
 // convertRelativeURLs converts all relative URL in document into absolute URL.
 // We do this for a, img, picture, figure, video, audio, source, link,
 // embed, iframe and object.
-func (arc *Archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
+func (arc *archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 	// Prepare nodes and methods
 	as := dom.GetElementsByTagName(doc, "a")
 	links := dom.GetElementsByTagName(doc, "link")
@@ -385,20 +385,20 @@ func (arc *Archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 }
 
 // removeScripts removes script and noscript tags from the document.
-func (arc *Archiver) removeScripts(doc *html.Node) {
+func (arc *archiver) removeScripts(doc *html.Node) {
 	scripts := dom.GetAllNodesWithTag(doc, "script", "noscript")
 	dom.RemoveNodes(scripts, nil)
 }
 
 // removeLinkIntegrityAttrs removes integrity attributes from link tags.
-func (arc *Archiver) removeLinkIntegrityAttr(doc *html.Node) {
+func (arc *archiver) removeLinkIntegrityAttr(doc *html.Node) {
 	for _, link := range dom.GetElementsByTagName(doc, "link") {
 		dom.RemoveAttribute(link, "integrity")
 	}
 }
 
 // removeComments find all comments in document then remove it.
-func (arc *Archiver) removeComments(doc *html.Node) {
+func (arc *archiver) removeComments(doc *html.Node) {
 	// Find all comments
 	var comments []*html.Node
 	var finder func(*html.Node)
@@ -423,7 +423,7 @@ func (arc *Archiver) removeComments(doc *html.Node) {
 
 // isSingleImage checks if node is image, or if node contains exactly
 // only one image whether as a direct child or as its descendants.
-func (arc *Archiver) isSingleImage(node *html.Node) bool {
+func (arc *archiver) isSingleImage(node *html.Node) bool {
 	if dom.TagName(node) == "img" {
 		return true
 	}

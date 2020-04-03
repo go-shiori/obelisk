@@ -1,16 +1,15 @@
-package main
+package obelisk
 
 import (
 	"context"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
-	"log"
 	nurl "net/url"
 	"strings"
 )
 
-func (arc *Archiver) processURL(ctx context.Context, url string) (string, error) {
+func (arc *archiver) processURL(ctx context.Context, url string) (string, error) {
 	// Make sure this URL is not empty, data or hash
 	url = strings.TrimSpace(url)
 	if url == "" || strings.HasPrefix(url, "data:") || strings.HasPrefix(url, "#") {
@@ -29,12 +28,12 @@ func (arc *Archiver) processURL(ctx context.Context, url string) (string, error)
 	arc.RUnlock()
 
 	if exist {
-		log.Println("(CACHE)", url)
+		arc.log("(CACHE)", url)
 		return cache, nil
 	}
 
 	// Download the resource, use semaphore to limit concurrent downloads
-	log.Println(url)
+	arc.log(url)
 	err = arc.dlSemaphore.Acquire(ctx, 1)
 	if err != nil {
 		return url, nil
