@@ -14,10 +14,11 @@ import (
 )
 
 var (
-	rxImgExtensions   = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)`)
 	rxLazyImageSrc    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp)\S*\s*$`)
 	rxLazyImageSrcset = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)\s+\d`)
-	rxImageSrcsetURL  = regexp.MustCompile(`(?i)(\S+)(\s+\d+[xw])?,?`)
+	rxImgExtensions   = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)`)
+	rxSrcsetURL       = regexp.MustCompile(`(?i)(\S+)(\s+[\d.]+[xw])?(\s*(?:,|$))`)
+	rxB64DataURL      = regexp.MustCompile(`(?i)^data:\s*([^\s;,]+)\s*;\s*base64\s*`)
 )
 
 func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
@@ -158,7 +159,7 @@ func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node) erro
 
 	var newSets []string
 	srcset := dom.GetAttribute(node, "srcset")
-	for _, parts := range rxImageSrcsetURL.FindAllStringSubmatch(srcset, -1) {
+	for _, parts := range rxSrcsetURL.FindAllStringSubmatch(srcset, -1) {
 		oldURL := parts[1]
 		targetWidth := parts[2]
 		newSet, err := arc.processURL(ctx, oldURL)
@@ -183,38 +184,35 @@ func (arc *archiver) replaceLazyImage(doc *html.Node) {
 	// Find img without source or attributes that might contains image, and
 	// remove it. This is done to prevent a placeholder img is replaced by
 	// img from noscript in next step.
-	for _, img := range dom.GetElementsByTagName(doc, "img") {
-		needToBeRemoved := true
+	imgs := dom.GetElementsByTagName(doc, "img")
+	dom.ForEachNode(imgs, func(img *html.Node, _ int) {
 		for _, attr := range img.Attr {
 			switch attr.Key {
 			case "src", "data-src", "srcset", "data-srcset":
-				needToBeRemoved = false
-				break
+				return
 			}
 
 			if rxImgExtensions.MatchString(attr.Val) {
-				needToBeRemoved = false
-				break
+				return
 			}
 		}
 
-		if needToBeRemoved {
-			img.Parent.RemoveChild(img)
-		}
-	}
+		img.Parent.RemoveChild(img)
+	})
 
 	// Next find noscript and try to extract its image
-	for _, noscript := range dom.GetElementsByTagName(doc, "noscript") {
+	noscripts := dom.GetElementsByTagName(doc, "noscript")
+	dom.ForEachNode(noscripts, func(noscript *html.Node, _ int) {
 		// Parse content of noscript and make sure it only contains image
 		noscriptContent := dom.TextContent(noscript)
 		tmpDoc, err := html.Parse(strings.NewReader(noscriptContent))
 		if err != nil {
-			continue
+			return
 		}
 
 		tmpBody := dom.GetElementsByTagName(tmpDoc, "body")[0]
 		if !arc.isSingleImage(tmpBody) {
-			continue
+			return
 		}
 
 		// If noscript has previous sibling and it only contains image,
@@ -249,14 +247,15 @@ func (arc *archiver) replaceLazyImage(doc *html.Node) {
 
 			dom.ReplaceChild(noscript.Parent, dom.FirstElementChild(tmpBody), prevElement)
 		}
-	}
+	})
 }
 
 // convertLazyImageAttrs convert attributes data-src and data-srcset
 // which often found in lazy-loaded images and pictures, into basic attribute
 // src and srcset, so images that can be loaded without JS.
 func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
-	for _, elem := range dom.GetAllNodesWithTag(doc, "img", "picture", "figure") {
+	imageNodes := dom.GetAllNodesWithTag(doc, "img", "picture", "figure")
+	dom.ForEachNode(imageNodes, func(elem *html.Node, _ int) {
 		src := dom.GetAttribute(elem, "src")
 		srcset := dom.GetAttribute(elem, "srcset")
 		nodeTag := dom.TagName(elem)
@@ -265,38 +264,48 @@ func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
 		// In some sites (e.g. Kotaku), they put 1px square image as data uri in
 		// the src attribute. So, here we check if the data uri is too short,
 		// just might as well remove it.
-		if src != "" && strings.HasPrefix(src, "data:") {
-			// I don't have any source but I guess if image is less
-			// than 100 bytes it will be too small, therefore it might
-			// be placeholder image. With that said, I will use 100B
-			// as threshold (or 133B after encoded to base64).
-			b64starts := strings.Index(src, "base64,") + 7
-			b64length := len(src) - b64starts
-			if b64length < 133 {
-				src = ""
-				dom.RemoveAttribute(elem, "src")
+		if src != "" && rxB64DataURL.MatchString(src) {
+			// Make sure it's not SVG, because SVG can have a meaningful image
+			// in under 133 bytes.
+			parts := rxB64DataURL.FindStringSubmatch(src)
+			if parts[1] == "image/svg+xml" {
+				return
+			}
+
+			// Make sure this element has other attributes which contains
+			// image. If it doesn't, then this src is important and
+			// shouldn't be removed.
+			srcCouldBeRemoved := false
+			for _, attr := range elem.Attr {
+				if attr.Key == "src" {
+					continue
+				}
+
+				if rxImgExtensions.MatchString(attr.Val) {
+					srcCouldBeRemoved = true
+					break
+				}
+			}
+
+			// Here we assume if image is less than 100 bytes (or 133B
+			// after encoded to base64) it will be too small, therefore
+			// it might be placeholder image.
+			if srcCouldBeRemoved {
+				b64starts := strings.Index(src, "base64") + 7
+				b64length := len(src) - b64starts
+				if b64length < 133 {
+					src = ""
+					dom.RemoveAttribute(elem, "src")
+				}
 			}
 		}
 
-		// Some websites store their resource for lazy-loaded image in data- attributes
-		// (e.g. websites that uses LazyLoad library), so here we try to move it.
-		if dataSrc := dom.GetAttribute(elem, "data-src"); dataSrc != "" {
-			src = dataSrc
-			dom.SetAttribute(elem, "src", dataSrc)
-			dom.RemoveAttribute(elem, "data-src")
-		}
-
-		if dataSrcset := dom.GetAttribute(elem, "data-srcset"); dataSrcset != "" {
-			srcset = dataSrcset
-			dom.SetAttribute(elem, "srcset", dataSrcset)
-			dom.RemoveAttribute(elem, "data-srcset")
-		}
-
 		if (src != "" || srcset != "") && !strings.Contains(strings.ToLower(nodeClass), "lazy") {
-			continue
+			return
 		}
 
-		for _, attr := range elem.Attr {
+		for i := 0; i < len(elem.Attr); i++ {
+			attr := elem.Attr[i]
 			if attr.Key == "src" || attr.Key == "srcset" {
 				continue
 			}
@@ -315,17 +324,16 @@ func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
 			if nodeTag == "img" || nodeTag == "picture" {
 				// if this is an img or picture, set the attribute directly
 				dom.SetAttribute(elem, copyTo, attr.Val)
-			} else if nodeTag == "figure" {
+			} else if nodeTag == "figure" && len(dom.GetAllNodesWithTag(elem, "img", "picture")) == 0 {
 				// if the item is a <figure> that does not contain an image or picture,
-				// create one and place it inside the figure
-				if len(dom.GetAllNodesWithTag(elem, "img", "picture")) == 0 {
-					img := dom.CreateElement("img")
-					dom.SetAttribute(img, copyTo, attr.Val)
-					dom.AppendChild(elem, img)
-				}
+				// create one and place it inside the figure see the nytimes-3
+				// testcase for an example
+				img := dom.CreateElement("img")
+				dom.SetAttribute(img, copyTo, attr.Val)
+				dom.AppendChild(elem, img)
 			}
 		}
-	}
+	})
 }
 
 // convertRelativeURLs converts all relative URL in document into absolute URL.
@@ -364,23 +372,14 @@ func (arc *archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 	for _, media := range medias {
 		convertNode(media, "src")
 		convertNode(media, "poster")
-		if !dom.HasAttribute(media, "srcset") {
-			continue
+
+		if srcset := dom.GetAttribute(media, "srcset"); srcset != "" {
+			newSrcset := rxSrcsetURL.ReplaceAllStringFunc(srcset, func(s string) string {
+				p := rxSrcsetURL.FindStringSubmatch(s)
+				return createAbsoluteURL(p[1], baseURL) + p[2] + p[3]
+			})
+			dom.SetAttribute(media, "srcset", newSrcset)
 		}
-
-		var newSets []string
-		srcset := dom.GetAttribute(media, "srcset")
-		for _, parts := range rxImageSrcsetURL.FindAllStringSubmatch(srcset, -1) {
-			oldURL := parts[1]
-			targetWidth := parts[2]
-
-			newSet := createAbsoluteURL(oldURL, baseURL)
-			newSet += targetWidth
-			newSets = append(newSets, newSet)
-		}
-
-		newSrcset := strings.Join(newSets, ",")
-		dom.SetAttribute(media, "srcset", newSrcset)
 	}
 }
 
