@@ -39,7 +39,7 @@ func (arc *archiver) processURL(ctx context.Context, url string) (string, error)
 		return url, nil
 	}
 
-	resp, err := downloadFile(url, arc.userAgent)
+	resp, err := arc.downloadFile(url)
 	arc.dlSemaphore.Release(1)
 	if err != nil {
 		return url, fmt.Errorf("download failed: %w", err)

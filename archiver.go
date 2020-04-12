@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	nurl "net/url"
 	"strings"
 	"sync"
@@ -19,7 +20,6 @@ var DefaultConfig = Config{
 	MaxNDownload: 10,
 	EnableLog:    false,
 	UserAgent:    DefaultUserAgent,
-	Cookie:       "",
 }
 
 // Config is configuration for archival process.
@@ -27,7 +27,6 @@ type Config struct {
 	MaxNDownload int64
 	EnableLog    bool
 	UserAgent    string
-	Cookie       string
 }
 
 // Request is data of archival request.
@@ -35,6 +34,7 @@ type Request struct {
 	Input   io.Reader
 	URL     string
 	DstPath string
+	Cookies []*http.Cookie
 }
 
 // archiver is the core of obelisk, which used to download a
@@ -47,6 +47,7 @@ type archiver struct {
 	dlSemaphore *semaphore.Weighted
 	logEnabled  bool
 	userAgent   string
+	cookies     []*http.Cookie
 }
 
 // Archive starts archival process for the specified request.
@@ -76,6 +77,7 @@ func Archive(ctx context.Context, req Request, cfg Config) error {
 		dlSemaphore: semaphore.NewWeighted(cfg.MaxNDownload),
 		logEnabled:  cfg.EnableLog,
 		userAgent:   cfg.UserAgent,
+		cookies:     req.Cookies,
 	}
 
 	arc.log("Obelisk started")
@@ -89,7 +91,7 @@ func Archive(ctx context.Context, req Request, cfg Config) error {
 	// If needed download page from source URL
 	contentType := "text/html"
 	if req.Input == nil {
-		resp, err := downloadFile(url.String(), arc.userAgent)
+		resp, err := arc.downloadFile(url.String())
 		if err != nil {
 			return fmt.Errorf("download failed: %w", err)
 		}
