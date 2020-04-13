@@ -10,8 +10,8 @@ import (
 
 func main() {
 	req := obelisk.Request{
-		URL:     "https://www.nytimes.com/interactive/2019/07/06/us/migrants-border-patrol-clint.html",
-		DstPath: "nytimes.html",
+		URL:     "https://www.washingtonpost.com/graphics/2020/world/corona-simulator/",
+		DstPath: "wapo.html",
 	}
 
 	cfg := obelisk.DefaultConfig

@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-func (arc *archiver) processURL(ctx context.Context, url string, parentURL string) (string, error) {
+func (arc *archiver) processURL(ctx context.Context, url string, parentURL string, embedded ...bool) (string, error) {
+	// Parse embedded value
+	isEmbedded := len(embedded) != 0 && embedded[0]
+
 	// Make sure this URL is not empty, data or hash
 	url = strings.TrimSpace(url)
 	if url == "" || strings.HasPrefix(url, "data:") || strings.HasPrefix(url, "#") {
@@ -59,8 +62,8 @@ func (arc *archiver) processURL(ctx context.Context, url string, parentURL strin
 	// or CSS it need to be processed again
 	var bodyContent []byte
 
-	switch contentType {
-	case "text/html":
+	switch {
+	case contentType == "text/html" && isEmbedded:
 		newHTML, err := arc.processHTML(ctx, resp.Body, parsedURL)
 		if err == nil {
 			bodyContent = []byte(newHTML)
@@ -68,7 +71,7 @@ func (arc *archiver) processURL(ctx context.Context, url string, parentURL strin
 			return url, err
 		}
 
-	case "text/css":
+	case contentType == "text/css":
 		newCSS, err := arc.processCSS(ctx, resp.Body, parsedURL)
 		if err == nil {
 			bodyContent = []byte(newCSS)

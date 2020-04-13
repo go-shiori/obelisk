@@ -86,10 +86,10 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 			switch dom.TagName(node) {
 			case "link":
 				return arc.processURLNode(ctx, node, "href", baseURL)
-			case "object":
-				return arc.processURLNode(ctx, node, "data", baseURL)
-			case "script", "embed", "iframe":
+			case "script":
 				return arc.processURLNode(ctx, node, "src", baseURL)
+			case "object", "embed", "iframe":
+				return arc.processEmbedNode(ctx, node, baseURL)
 			case "style":
 				return arc.processStyleNode(ctx, node, baseURL)
 			case "img", "picture", "figure", "video", "audio", "source":
@@ -487,6 +487,25 @@ func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrNa
 
 	url := dom.GetAttribute(node, attrName)
 	newURL, err := arc.processURL(ctx, url, baseURL.String())
+	if err == nil {
+		dom.SetAttribute(node, attrName, newURL)
+	}
+
+	return err
+}
+
+func (arc *archiver) processEmbedNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+	attrName := "src"
+	if dom.TagName(node) == "object" {
+		attrName = "data"
+	}
+
+	if !dom.HasAttribute(node, attrName) {
+		return nil
+	}
+
+	url := dom.GetAttribute(node, attrName)
+	newURL, err := arc.processURL(ctx, url, baseURL.String(), true)
 	if err == nil {
 		dom.SetAttribute(node, attrName, newURL)
 	}
