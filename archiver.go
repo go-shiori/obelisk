@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	nurl "net/url"
 	"strings"
@@ -36,7 +37,6 @@ type Config struct {
 type Request struct {
 	Input   io.Reader
 	URL     string
-	DstPath string
 	Cookies []*http.Cookie
 }
 
@@ -54,7 +54,7 @@ type archiver struct {
 }
 
 // Archive starts archival process for the specified request.
-func Archive(ctx context.Context, req Request, cfg Config) error {
+func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
 	// Validate config
 	if cfg.MaxConcurrentDownload <= 0 {
 		cfg.MaxConcurrentDownload = 10
@@ -66,11 +66,7 @@ func Archive(ctx context.Context, req Request, cfg Config) error {
 
 	// Validate request
 	if req.URL == "" {
-		return fmt.Errorf("request url is not specified")
-	}
-
-	if req.DstPath == "" {
-		return fmt.Errorf("destination path is not specified")
+		return nil, fmt.Errorf("request url is not specified")
 	}
 
 	// Create archiver
@@ -88,7 +84,7 @@ func Archive(ctx context.Context, req Request, cfg Config) error {
 	// Make sure request URL valid
 	url, err := nurl.ParseRequestURI(req.URL)
 	if err != nil || url.Scheme == "" || url.Hostname() == "" {
-		return fmt.Errorf("url \"%s\" is not valid", req.URL)
+		return nil, fmt.Errorf("url \"%s\" is not valid", req.URL)
 	}
 
 	// If needed download page from source URL
@@ -96,7 +92,7 @@ func Archive(ctx context.Context, req Request, cfg Config) error {
 	if req.Input == nil {
 		resp, err := arc.downloadFile(url.String())
 		if err != nil {
-			return fmt.Errorf("download failed: %w", err)
+			return nil, fmt.Errorf("download failed: %w", err)
 		}
 		defer resp.Body.Close()
 
@@ -105,23 +101,17 @@ func Archive(ctx context.Context, req Request, cfg Config) error {
 	}
 
 	// Check the type of the downloaded file.
-	// If it's not HTML, just save it as it is to storage.
+	// If it's not HTML, just return it as it is.
 	if !strings.HasPrefix(contentType, "text/html") {
-		err = saveToFile(req.Input, req.DstPath)
-		return err
+		return ioutil.ReadAll(req.Input)
 	}
 
 	// If it's HTML process it
 	result, err := arc.processHTML(ctx, req.Input, url)
 	if err != nil {
-		return err
-	}
-
-	err = saveToFile(strings.NewReader(result), req.DstPath)
-	if err != nil {
-		return err
+		return nil, err
 	}
 
 	arc.log("Obelisk finished")
-	return nil
+	return []byte(result), nil
 }

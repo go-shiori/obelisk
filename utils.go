@@ -1,10 +1,7 @@
 package obelisk
 
 import (
-	"io"
 	nurl "net/url"
-	"os"
-	fp "path/filepath"
 	"regexp"
 	"strings"
 )
@@ -12,27 +9,6 @@ import (
 var (
 	rxStyleURL = regexp.MustCompile(`(?i)^url\((.+)\)$`)
 )
-
-// saveToFile saves an input into specified path
-func saveToFile(input io.Reader, dstPath string) error {
-	err := os.MkdirAll(fp.Dir(dstPath), os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create(dstPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = io.Copy(f, input)
-	if err != nil {
-		return err
-	}
-
-	return f.Sync()
-}
 
 // isValidURL checks if URL is valid.
 func isValidURL(s string) bool {
