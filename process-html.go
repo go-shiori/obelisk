@@ -29,18 +29,20 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	}
 
 	// Prepare documents by doing these steps :
+	// - Set Content-Security-Policy to make sure no unwanted request happened
+	// - Remove elements that disabled by config
+	// - Remove all comments in documents
 	// - Replace lazy loaded image with image from its noscript counterpart
 	// - Convert data-src and data-srcset attribute in lazy image to src and srcset
 	// - Convert relative URL into absolute URL
-	// - Remove all script and noscript tags
 	// - Remove subresources integrity attribute from links
-	// - Remove all comments in documents
+	arc.setContentSecurityPolicy(doc)
+	arc.removeDisabledElements(doc)
+	arc.removeComments(doc)
 	arc.replaceLazyImage(doc)
 	arc.convertLazyImageAttrs(doc)
 	arc.convertRelativeURLs(doc, baseURL)
-	arc.removeScripts(doc)
 	arc.removeLinkIntegrityAttr(doc)
-	arc.removeComments(doc)
 
 	// Find all nodes which might has subresource.
 	// A node might has subresource if it fulfills one of these criterias :
@@ -61,7 +63,7 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 				resourceNodes[node] = struct{}{}
 			}
 
-		case "iframe", "embed", "object", "style",
+		case "iframe", "embed", "object", "style", "script",
 			"img", "picture", "figure", "video", "audio", "source":
 			resourceNodes[node] = struct{}{}
 		}
@@ -86,7 +88,7 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 				return arc.processURLNode(ctx, node, "href")
 			case "object":
 				return arc.processURLNode(ctx, node, "data")
-			case "embed", "iframe":
+			case "script", "embed", "iframe":
 				return arc.processURLNode(ctx, node, "src")
 			case "style":
 				return arc.processStyleNode(ctx, node, baseURL)
@@ -108,72 +110,111 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	return docHTML, nil
 }
 
-func (arc *archiver) processStyleAttr(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
-	style := dom.GetAttribute(node, "style")
-	newStyle, err := arc.processCSS(ctx, strings.NewReader(style), baseURL)
-	if err == nil {
-		dom.SetAttribute(node, "style", newStyle)
-	}
-
-	return err
-}
-
-func (arc *archiver) processStyleNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
-	style := dom.TextContent(node)
-	newStyle, err := arc.processCSS(ctx, strings.NewReader(style), baseURL)
-	if err == nil {
-		dom.SetTextContent(node, newStyle)
-	}
-
-	return err
-}
-
-func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrName string) error {
-	if !dom.HasAttribute(node, attrName) {
-		return nil
-	}
-
-	url := dom.GetAttribute(node, attrName)
-	newURL, err := arc.processURL(ctx, url)
-	if err == nil {
-		dom.SetAttribute(node, attrName, newURL)
-	}
-
-	return err
-}
-
-func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node) error {
-	err := arc.processURLNode(ctx, node, "src")
-	if err != nil {
-		return err
-	}
-
-	err = arc.processURLNode(ctx, node, "poster")
-	if err != nil {
-		return err
-	}
-
-	if !dom.HasAttribute(node, "srcset") {
-		return nil
-	}
-
-	var newSets []string
-	srcset := dom.GetAttribute(node, "srcset")
-	for _, parts := range rxSrcsetURL.FindAllStringSubmatch(srcset, -1) {
-		oldURL := parts[1]
-		targetWidth := parts[2]
-		newSet, err := arc.processURL(ctx, oldURL)
-		if err != nil {
-			return err
+// setContentSecurityPolicy prevent browsers from requesting any remote
+// resources by setting Content-Security-Policy to only allow from
+// inline element and data URL.
+func (arc *archiver) setContentSecurityPolicy(doc *html.Node) {
+	// Remove existing CSP
+	for _, meta := range dom.GetElementsByTagName(doc, "meta") {
+		httpEquiv := dom.GetAttribute(meta, "http-equiv")
+		if httpEquiv == "Content-Security-Policy" {
+			meta.Parent.RemoveChild(meta)
 		}
-
-		newSet += targetWidth
-		newSets = append(newSets, newSet)
 	}
 
-	newSrcset := strings.Join(newSets, ",")
-	dom.SetAttribute(node, "srcset", newSrcset)
-	return nil
+	// Prepare list of CSP
+	policies := []string{
+		"default-src 'unsafe-inline' data:;",
+		"connect-src 'none';",
+	}
+
+	if arc.config.DisableJS {
+		policies = append(policies, "script-src 'none';")
+	}
+
+	if arc.config.DisableCSS {
+		policies = append(policies, "style-src 'none';")
+	}
+
+	if arc.config.DisableEmbeds {
+		policies = append(policies, "frame-src 'none'; child-src 'none';")
+	}
+
+	if arc.config.DisableMedias {
+		policies = append(policies, "image-src 'none'; media-src 'none';")
+	}
+
+	// Find the head, create it if necessary
+	heads := dom.GetElementsByTagName(doc, "head")
+	if len(heads) == 0 {
+		newHead := dom.CreateElement("head")
+		dom.PrependChild(doc, newHead)
+		heads = []*html.Node{newHead}
+	}
+
+	// Put the new CSP
+	for i := len(policies) - 1; i >= 0; i-- {
+		meta := dom.CreateElement("meta")
+		dom.SetAttribute(meta, "http-equiv", "Content-Security-Policy")
+		dom.SetAttribute(meta, "content", policies[i])
+		dom.PrependChild(heads[0], meta)
+	}
+}
+
+// removeDisabledElements removes unneeded elements from the document.
+func (arc *archiver) removeDisabledElements(doc *html.Node) {
+	if arc.config.DisableJS {
+		// Remove script tags
+		scripts := dom.GetAllNodesWithTag(doc, "script")
+		dom.RemoveNodes(scripts, nil)
+
+		// Remove links with javascript URL scheme
+		for _, a := range dom.GetElementsByTagName(doc, "a") {
+			href := dom.GetAttribute(a, "href")
+			if strings.HasPrefix(href, "javascript:") {
+				dom.SetAttribute(a, "href", "#")
+			}
+		}
+	}
+
+	if arc.config.DisableCSS {
+		// Remove style tags
+		styles := dom.GetAllNodesWithTag(doc, "style")
+		dom.RemoveNodes(styles, nil)
+
+		// Remove inline style
+		for _, node := range dom.GetElementsByTagName(doc, "*") {
+			if dom.HasAttribute(node, "style") {
+				dom.RemoveAttribute(node, "style")
+			}
+		}
+	}
+
+	if arc.config.DisableEmbeds {
+		embeds := dom.GetAllNodesWithTag(doc, "object", "embed", "iframe")
+		dom.RemoveNodes(embeds, nil)
+	}
+
+	if arc.config.DisableMedias {
+		medias := dom.GetAllNodesWithTag(doc, "img", "picture", "figure", "video", "audio", "source")
+		dom.RemoveNodes(medias, nil)
+	}
+}
+
+// isSingleImage checks if node is image, or if node contains exactly
+// only one image whether as a direct child or as its descendants.
+func (arc *archiver) isSingleImage(node *html.Node) bool {
+	if dom.TagName(node) == "img" {
+		return true
+	}
+
+	children := dom.Children(node)
+	textContent := dom.TextContent(node)
+	if len(children) != 1 || strings.TrimSpace(textContent) != "" {
+		return false
+	}
+
+	return arc.isSingleImage(children[0])
 }
 
 // replaceLazyImage finds all <noscript> that are located after <img> nodes,
@@ -332,6 +373,9 @@ func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
 				dom.SetAttribute(img, copyTo, attr.Val)
 				dom.AppendChild(elem, img)
 			}
+
+			// Since the attribute already copied, just remove it
+			dom.RemoveAttribute(elem, attr.Key)
 		}
 	})
 }
@@ -344,6 +388,7 @@ func (arc *archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 	as := dom.GetElementsByTagName(doc, "a")
 	links := dom.GetElementsByTagName(doc, "link")
 	embeds := dom.GetElementsByTagName(doc, "embed")
+	scripts := dom.GetElementsByTagName(doc, "script")
 	iframes := dom.GetElementsByTagName(doc, "iframe")
 	objects := dom.GetElementsByTagName(doc, "object")
 	medias := dom.GetAllNodesWithTag(doc, "img", "picture", "figure", "video", "audio", "source")
@@ -366,6 +411,7 @@ func (arc *archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 	convertNodes(as, "href")
 	convertNodes(links, "href")
 	convertNodes(embeds, "src")
+	convertNodes(scripts, "src")
 	convertNodes(iframes, "src")
 	convertNodes(objects, "data")
 
@@ -381,12 +427,6 @@ func (arc *archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 			dom.SetAttribute(media, "srcset", newSrcset)
 		}
 	}
-}
-
-// removeScripts removes script and noscript tags from the document.
-func (arc *archiver) removeScripts(doc *html.Node) {
-	scripts := dom.GetAllNodesWithTag(doc, "script", "noscript")
-	dom.RemoveNodes(scripts, nil)
 }
 
 // removeLinkIntegrityAttrs removes integrity attributes from link tags.
@@ -420,18 +460,70 @@ func (arc *archiver) removeComments(doc *html.Node) {
 	dom.RemoveNodes(comments, nil)
 }
 
-// isSingleImage checks if node is image, or if node contains exactly
-// only one image whether as a direct child or as its descendants.
-func (arc *archiver) isSingleImage(node *html.Node) bool {
-	if dom.TagName(node) == "img" {
-		return true
+func (arc *archiver) processStyleAttr(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+	style := dom.GetAttribute(node, "style")
+	newStyle, err := arc.processCSS(ctx, strings.NewReader(style), baseURL)
+	if err == nil {
+		dom.SetAttribute(node, "style", newStyle)
 	}
 
-	children := dom.Children(node)
-	textContent := dom.TextContent(node)
-	if len(children) != 1 || strings.TrimSpace(textContent) != "" {
-		return false
+	return err
+}
+
+func (arc *archiver) processStyleNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+	style := dom.TextContent(node)
+	newStyle, err := arc.processCSS(ctx, strings.NewReader(style), baseURL)
+	if err == nil {
+		dom.SetTextContent(node, newStyle)
 	}
 
-	return arc.isSingleImage(children[0])
+	return err
+}
+
+func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrName string) error {
+	if !dom.HasAttribute(node, attrName) {
+		return nil
+	}
+
+	url := dom.GetAttribute(node, attrName)
+	newURL, err := arc.processURL(ctx, url)
+	if err == nil {
+		dom.SetAttribute(node, attrName, newURL)
+	}
+
+	return err
+}
+
+func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node) error {
+	err := arc.processURLNode(ctx, node, "src")
+	if err != nil {
+		return err
+	}
+
+	err = arc.processURLNode(ctx, node, "poster")
+	if err != nil {
+		return err
+	}
+
+	if !dom.HasAttribute(node, "srcset") {
+		return nil
+	}
+
+	var newSets []string
+	srcset := dom.GetAttribute(node, "srcset")
+	for _, parts := range rxSrcsetURL.FindAllStringSubmatch(srcset, -1) {
+		oldURL := parts[1]
+		targetWidth := parts[2]
+		newSet, err := arc.processURL(ctx, oldURL)
+		if err != nil {
+			return err
+		}
+
+		newSet += targetWidth
+		newSets = append(newSets, newSet)
+	}
+
+	newSrcset := strings.Join(newSets, ",")
+	dom.SetAttribute(node, "srcset", newSrcset)
+	return nil
 }

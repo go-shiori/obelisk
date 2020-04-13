@@ -12,21 +12,23 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// DefaultUserAgent is the default user agent to use, which is Chrome's.
-var DefaultUserAgent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0"
+var (
+	// DefaultConfig is the default configuration for archiver.
+	DefaultConfig = Config{}
 
-// DefaultConfig is the default configuration for archiver.
-var DefaultConfig = Config{
-	MaxNDownload: 10,
-	EnableLog:    false,
-	UserAgent:    DefaultUserAgent,
-}
+	// DefaultUserAgent is the default user agent to use, which is Chrome's.
+	DefaultUserAgent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0"
+)
 
 // Config is configuration for archival process.
 type Config struct {
-	MaxNDownload int64
-	EnableLog    bool
-	UserAgent    string
+	UserAgent             string
+	EnableLog             bool
+	DisableJS             bool
+	DisableCSS            bool
+	DisableEmbeds         bool
+	DisableMedias         bool
+	MaxConcurrentDownload int64
 }
 
 // Request is data of archival request.
@@ -45,16 +47,16 @@ type archiver struct {
 	ctx         context.Context
 	cache       map[string]string
 	dlSemaphore *semaphore.Weighted
-	logEnabled  bool
-	userAgent   string
-	cookies     []*http.Cookie
+
+	config  Config
+	cookies []*http.Cookie
 }
 
 // Archive starts archival process for the specified request.
 func Archive(ctx context.Context, req Request, cfg Config) error {
 	// Validate config
-	if cfg.MaxNDownload <= 0 {
-		cfg.MaxNDownload = 10
+	if cfg.MaxConcurrentDownload <= 0 {
+		cfg.MaxConcurrentDownload = 10
 	}
 
 	if cfg.UserAgent == "" {
@@ -74,10 +76,10 @@ func Archive(ctx context.Context, req Request, cfg Config) error {
 	arc := &archiver{
 		ctx:         ctx,
 		cache:       make(map[string]string),
-		dlSemaphore: semaphore.NewWeighted(cfg.MaxNDownload),
-		logEnabled:  cfg.EnableLog,
-		userAgent:   cfg.UserAgent,
-		cookies:     req.Cookies,
+		dlSemaphore: semaphore.NewWeighted(cfg.MaxConcurrentDownload),
+
+		config:  cfg,
+		cookies: req.Cookies,
 	}
 
 	arc.log("Obelisk started")
