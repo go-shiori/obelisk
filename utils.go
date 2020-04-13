@@ -34,6 +34,12 @@ func saveToFile(input io.Reader, dstPath string) error {
 	return f.Sync()
 }
 
+// isValidURL checks if URL is valid.
+func isValidURL(s string) bool {
+	_, err := nurl.ParseRequestURI(s)
+	return err == nil
+}
+
 // createAbsoluteURL convert url to absolute path based on base.
 func createAbsoluteURL(url string, base *nurl.URL) string {
 	url = strings.TrimSpace(url)

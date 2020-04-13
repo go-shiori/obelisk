@@ -16,10 +16,12 @@ func (arc *archiver) processURL(ctx context.Context, url string) (string, error)
 		return url, nil
 	}
 
-	// Parse URL to make sure it's valid
+	// Parse URL to make sure it's valid request URL
+	// If not, there might be some error while preparing document, so
+	// just return the URL as it is
 	parsedURL, err := nurl.ParseRequestURI(url)
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Hostname() == "" {
-		return url, fmt.Errorf("url \"%s\" is not valid", url)
+		return url, nil
 	}
 
 	// Check in cache to see if this URL already processed

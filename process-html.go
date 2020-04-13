@@ -322,7 +322,7 @@ func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
 					continue
 				}
 
-				if rxImgExtensions.MatchString(attr.Val) {
+				if rxImgExtensions.MatchString(attr.Val) && isValidURL(attr.Val) {
 					srcCouldBeRemoved = true
 					break
 				}
@@ -358,7 +358,7 @@ func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
 				copyTo = "src"
 			}
 
-			if copyTo == "" {
+			if copyTo == "" || !isValidURL(attr.Val) {
 				continue
 			}
 
