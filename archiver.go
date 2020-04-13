@@ -24,6 +24,7 @@ var (
 type Config struct {
 	UserAgent             string
 	EnableLog             bool
+	LogParentURL          bool
 	DisableJS             bool
 	DisableCSS            bool
 	DisableEmbeds         bool

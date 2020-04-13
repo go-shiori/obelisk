@@ -33,12 +33,12 @@ func (arc *archiver) processURL(ctx context.Context, url string, parentURL strin
 	arc.RUnlock()
 
 	if exist {
-		arc.logf("(CACHE) %s\n\tfrom %s\n", url, parentURL)
+		arc.logURL(url, parentURL, true)
 		return cache, nil
 	}
 
 	// Download the resource, use semaphore to limit concurrent downloads
-	arc.logf("%s\n\tfrom %s\n", url, parentURL)
+	arc.logURL(url, parentURL, false)
 	err = arc.dlSemaphore.Acquire(ctx, 1)
 	if err != nil {
 		return url, nil

@@ -1,6 +1,8 @@
 package obelisk
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/sirupsen/logrus"
+)
 
 func (arc *archiver) log(args ...interface{}) {
 	if arc.config.EnableLog {
@@ -8,8 +10,19 @@ func (arc *archiver) log(args ...interface{}) {
 	}
 }
 
-func (arc *archiver) logf(format string, args ...interface{}) {
-	if arc.config.EnableLog {
-		logrus.Printf(format, args...)
+func (arc *archiver) logURL(url, parentURL string, isCached bool) {
+	if !arc.config.EnableLog {
+		return
 	}
+
+	fields := logrus.Fields{}
+	if arc.config.LogParentURL {
+		fields["parent"] = parentURL
+	}
+
+	if isCached {
+		fields["cached"] = true
+	}
+
+	logrus.WithFields(fields).Println(url)
 }
