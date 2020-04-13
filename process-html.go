@@ -85,15 +85,15 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 			// Update node depending on its tag name
 			switch dom.TagName(node) {
 			case "link":
-				return arc.processURLNode(ctx, node, "href")
+				return arc.processURLNode(ctx, node, "href", baseURL)
 			case "object":
-				return arc.processURLNode(ctx, node, "data")
+				return arc.processURLNode(ctx, node, "data", baseURL)
 			case "script", "embed", "iframe":
-				return arc.processURLNode(ctx, node, "src")
+				return arc.processURLNode(ctx, node, "src", baseURL)
 			case "style":
 				return arc.processStyleNode(ctx, node, baseURL)
 			case "img", "picture", "figure", "video", "audio", "source":
-				return arc.processMediaNode(ctx, node)
+				return arc.processMediaNode(ctx, node, baseURL)
 			default:
 				return nil
 			}
@@ -480,13 +480,13 @@ func (arc *archiver) processStyleNode(ctx context.Context, node *html.Node, base
 	return err
 }
 
-func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrName string) error {
+func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrName string, baseURL *nurl.URL) error {
 	if !dom.HasAttribute(node, attrName) {
 		return nil
 	}
 
 	url := dom.GetAttribute(node, attrName)
-	newURL, err := arc.processURL(ctx, url)
+	newURL, err := arc.processURL(ctx, url, baseURL.String())
 	if err == nil {
 		dom.SetAttribute(node, attrName, newURL)
 	}
@@ -494,13 +494,13 @@ func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrNa
 	return err
 }
 
-func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node) error {
-	err := arc.processURLNode(ctx, node, "src")
+func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+	err := arc.processURLNode(ctx, node, "src", baseURL)
 	if err != nil {
 		return err
 	}
 
-	err = arc.processURLNode(ctx, node, "poster")
+	err = arc.processURLNode(ctx, node, "poster", baseURL)
 	if err != nil {
 		return err
 	}
@@ -514,7 +514,7 @@ func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node) erro
 	for _, parts := range rxSrcsetURL.FindAllStringSubmatch(srcset, -1) {
 		oldURL := parts[1]
 		targetWidth := parts[2]
-		newSet, err := arc.processURL(ctx, oldURL)
+		newSet, err := arc.processURL(ctx, oldURL, baseURL.String())
 		if err != nil {
 			return err
 		}

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func (arc *archiver) processURL(ctx context.Context, url string) (string, error) {
+func (arc *archiver) processURL(ctx context.Context, url string, parentURL string) (string, error) {
 	// Make sure this URL is not empty, data or hash
 	url = strings.TrimSpace(url)
 	if url == "" || strings.HasPrefix(url, "data:") || strings.HasPrefix(url, "#") {
@@ -30,12 +30,12 @@ func (arc *archiver) processURL(ctx context.Context, url string) (string, error)
 	arc.RUnlock()
 
 	if exist {
-		arc.log("(CACHE)", url)
+		arc.logf("(CACHE) %s\n\tfrom %s\n", url, parentURL)
 		return cache, nil
 	}
 
 	// Download the resource, use semaphore to limit concurrent downloads
-	arc.log(url)
+	arc.logf("%s\n\tfrom %s\n", url, parentURL)
 	err = arc.dlSemaphore.Acquire(ctx, 1)
 	if err != nil {
 		return url, nil
