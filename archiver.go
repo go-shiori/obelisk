@@ -45,9 +45,10 @@ type Request struct {
 type archiver struct {
 	sync.RWMutex
 
-	ctx         context.Context
-	cache       map[string]string
-	dlSemaphore *semaphore.Weighted
+	ctx          context.Context
+	cache        map[string][]byte
+	contentTypes map[string]string
+	dlSemaphore  *semaphore.Weighted
 
 	config  Config
 	cookies []*http.Cookie
@@ -71,9 +72,10 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
 
 	// Create archiver
 	arc := &archiver{
-		ctx:         ctx,
-		cache:       make(map[string]string),
-		dlSemaphore: semaphore.NewWeighted(cfg.MaxConcurrentDownload),
+		ctx:          ctx,
+		cache:        make(map[string][]byte),
+		contentTypes: make(map[string]string),
+		dlSemaphore:  semaphore.NewWeighted(cfg.MaxConcurrentDownload),
 
 		config:  cfg,
 		cookies: req.Cookies,

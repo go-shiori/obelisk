@@ -2,57 +2,60 @@ package obelisk
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	nurl "net/url"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
-func (arc *archiver) processURL(ctx context.Context, url string, parentURL string, embedded ...bool) (string, error) {
+var errSkippedURL = errors.New("skip processing url")
+
+func (arc *archiver) processURL(ctx context.Context, url string, parentURL string, embedded ...bool) ([]byte, string, error) {
 	// Parse embedded value
 	isEmbedded := len(embedded) != 0 && embedded[0]
 
-	// Make sure this URL is not empty, data or hash
+	// Make sure this URL is not empty, data or hash. If yes, just skip it.
 	url = strings.TrimSpace(url)
 	if url == "" || strings.HasPrefix(url, "data:") || strings.HasPrefix(url, "#") {
-		return url, nil
+		return nil, "", errSkippedURL
 	}
 
-	// Parse URL to make sure it's valid request URL
-	// If not, there might be some error while preparing document, so
-	// just return the URL as it is
+	// Parse URL to make sure it's valid request URL. If not, there might be
+	// some error while preparing document, so just skip this URL
 	parsedURL, err := nurl.ParseRequestURI(url)
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Hostname() == "" {
-		return url, nil
+		return nil, "", errSkippedURL
 	}
 
 	// Check in cache to see if this URL already processed
 	arc.RLock()
-	cache, exist := arc.cache[url]
+	cache, cacheExist := arc.cache[url]
+	contentType, contentTypeExist := arc.contentTypes[url]
 	arc.RUnlock()
 
-	if exist {
+	if cacheExist && contentTypeExist {
 		arc.logURL(url, parentURL, true)
-		return cache, nil
+		return cache, contentType, nil
 	}
 
 	// Download the resource, use semaphore to limit concurrent downloads
 	arc.logURL(url, parentURL, false)
 	err = arc.dlSemaphore.Acquire(ctx, 1)
 	if err != nil {
-		return url, nil
+		return nil, "", nil
 	}
 
 	resp, err := arc.downloadFile(url)
 	arc.dlSemaphore.Release(1)
 	if err != nil {
-		return url, fmt.Errorf("download failed: %w", err)
+		return nil, "", fmt.Errorf("download failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Get content type
-	contentType := resp.Header.Get("Content-Type")
+	contentType = resp.Header.Get("Content-Type")
 	contentType = strings.TrimSpace(contentType)
 	if contentType == "" {
 		contentType = "text/plain"
@@ -68,7 +71,7 @@ func (arc *archiver) processURL(ctx context.Context, url string, parentURL strin
 		if err == nil {
 			bodyContent = []byte(newHTML)
 		} else {
-			return url, err
+			return nil, "", err
 		}
 
 	case contentType == "text/css":
@@ -76,24 +79,21 @@ func (arc *archiver) processURL(ctx context.Context, url string, parentURL strin
 		if err == nil {
 			bodyContent = []byte(newCSS)
 		} else {
-			return url, err
+			return nil, "", err
 		}
 
 	default:
 		bodyContent, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return url, err
+			return nil, "", err
 		}
 	}
 
-	// Create data URL
-	b64encoded := base64.StdEncoding.EncodeToString(bodyContent)
-	dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, b64encoded)
-
 	// Save data URL to cache
 	arc.Lock()
-	arc.cache[url] = dataURL
+	arc.cache[url] = bodyContent
+	arc.contentTypes[url] = contentType
 	arc.Unlock()
 
-	return dataURL, nil
+	return bodyContent, contentType, nil
 }
