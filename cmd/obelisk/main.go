@@ -23,8 +23,8 @@ func main() {
 
 	cmd.Flags().StringP("user-agent", "u", "", "set custom user agent")
 	cmd.Flags().StringP("output", "o", "", "path to save archival result")
+	cmd.Flags().BoolP("quiet", "q", false, "disable logging")
 	cmd.Flags().BoolP("gzip", "z", false, "gzip archival result")
-	cmd.Flags().BoolP("log", "l", false, "enable logging")
 	cmd.Flags().Bool("no-js", false, "disable JavaScript")
 	cmd.Flags().Bool("no-css", false, "disable CSS styling")
 	cmd.Flags().Bool("no-embeds", false, "remove embedded elements (e.g iframe)")
@@ -45,7 +45,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	userAgent, _ := cmd.Flags().GetString("user-agent")
 	outputPath, _ := cmd.Flags().GetString("output")
 	useGzip, _ := cmd.Flags().GetBool("gzip")
-	enableLog, _ := cmd.Flags().GetBool("log")
+	disableLog, _ := cmd.Flags().GetBool("quiet")
 	disableJS, _ := cmd.Flags().GetBool("no-js")
 	disableCSS, _ := cmd.Flags().GetBool("no-css")
 	disableEmbeds, _ := cmd.Flags().GetBool("no-embeds")
@@ -56,8 +56,8 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	// Run archiver
 	cfg := obelisk.Config{
 		UserAgent:             userAgent,
-		EnableLog:             enableLog,
-		LogParentURL:          enableLog && useVerboseLog,
+		EnableLog:             !disableLog,
+		LogParentURL:          !disableLog && useVerboseLog,
 		DisableJS:             disableJS,
 		DisableCSS:            disableCSS,
 		DisableEmbeds:         disableEmbeds,
