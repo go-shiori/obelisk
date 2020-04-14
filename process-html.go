@@ -30,16 +30,16 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 
 	// Prepare documents by doing these steps :
 	// - Set Content-Security-Policy to make sure no unwanted request happened
-	// - Remove elements that disabled by config
+	// - Apply configuration to documents
+	// - Replace all noscript to divs, to make it processed as well
 	// - Remove all comments in documents
-	// - Replace lazy loaded image with image from its noscript counterpart
 	// - Convert data-src and data-srcset attribute in lazy image to src and srcset
 	// - Convert relative URL into absolute URL
 	// - Remove subresources integrity attribute from links
 	arc.setContentSecurityPolicy(doc)
-	arc.removeDisabledElements(doc)
+	arc.applyConfiguration(doc)
+	arc.convertNoScriptToDiv(doc, true)
 	arc.removeComments(doc)
-	arc.replaceLazyImage(doc)
 	arc.convertLazyImageAttrs(doc)
 	arc.convertRelativeURLs(doc, baseURL)
 	arc.removeLinkIntegrityAttr(doc)
@@ -105,6 +105,9 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 		return "", err
 	}
 
+	// Revert the converted noscripts
+	arc.revertConvertedNoScript(doc)
+
 	// Convert document back to string
 	docHTML := dom.OuterHTML(doc)
 	return docHTML, nil
@@ -161,8 +164,8 @@ func (arc *archiver) setContentSecurityPolicy(doc *html.Node) {
 	}
 }
 
-// removeDisabledElements removes unneeded elements from the document.
-func (arc *archiver) removeDisabledElements(doc *html.Node) {
+// applyConfiguration removes or replace elements following the configuration.
+func (arc *archiver) applyConfiguration(doc *html.Node) {
 	if arc.config.DisableJS {
 		// Remove script tags
 		scripts := dom.GetAllNodesWithTag(doc, "script")
@@ -175,6 +178,9 @@ func (arc *archiver) removeDisabledElements(doc *html.Node) {
 				dom.SetAttribute(a, "href", "#")
 			}
 		}
+
+		// Convert noscript to div
+		arc.convertNoScriptToDiv(doc, false)
 	}
 
 	if arc.config.DisableCSS {
@@ -201,93 +207,31 @@ func (arc *archiver) removeDisabledElements(doc *html.Node) {
 	}
 }
 
-// isSingleImage checks if node is image, or if node contains exactly
-// only one image whether as a direct child or as its descendants.
-func (arc *archiver) isSingleImage(node *html.Node) bool {
-	if dom.TagName(node) == "img" {
-		return true
-	}
-
-	children := dom.Children(node)
-	textContent := dom.TextContent(node)
-	if len(children) != 1 || strings.TrimSpace(textContent) != "" {
-		return false
-	}
-
-	return arc.isSingleImage(children[0])
-}
-
-// replaceLazyImage finds all <noscript> that are located after <img> nodes,
-// and which contain only one <img> element. Replace the first image with
-// the image from inside the <noscript> tag, and remove the <noscript> tag.
-// This improves the quality of the images we use on some sites (e.g. Medium).
-func (arc *archiver) replaceLazyImage(doc *html.Node) {
-	// Find img without source or attributes that might contains image, and
-	// remove it. This is done to prevent a placeholder img is replaced by
-	// img from noscript in next step.
-	imgs := dom.GetElementsByTagName(doc, "img")
-	dom.ForEachNode(imgs, func(img *html.Node, _ int) {
-		for _, attr := range img.Attr {
-			switch attr.Key {
-			case "src", "data-src", "srcset", "data-srcset":
-				return
-			}
-
-			if rxImgExtensions.MatchString(attr.Val) {
-				return
-			}
-		}
-
-		img.Parent.RemoveChild(img)
-	})
-
-	// Next find noscript and try to extract its image
+// convertNoScriptToDiv convert all noscript to div element.
+func (arc *archiver) convertNoScriptToDiv(doc *html.Node, markNewDiv bool) {
 	noscripts := dom.GetElementsByTagName(doc, "noscript")
 	dom.ForEachNode(noscripts, func(noscript *html.Node, _ int) {
-		// Parse content of noscript and make sure it only contains image
+		// Parse noscript content
 		noscriptContent := dom.TextContent(noscript)
 		tmpDoc, err := html.Parse(strings.NewReader(noscriptContent))
 		if err != nil {
 			return
 		}
-
 		tmpBody := dom.GetElementsByTagName(tmpDoc, "body")[0]
-		if !arc.isSingleImage(tmpBody) {
-			return
+
+		// Create new div to contain noscript content
+		div := dom.CreateElement("div")
+		for _, child := range dom.ChildNodes(tmpBody) {
+			dom.AppendChild(div, child)
 		}
 
-		// If noscript has previous sibling and it only contains image,
-		// replace it with noscript content. However we also keep old
-		// attributes that might contains image.
-		prevElement := dom.PreviousElementSibling(noscript)
-		if prevElement != nil && arc.isSingleImage(prevElement) {
-			prevImg := prevElement
-			if dom.TagName(prevImg) != "img" {
-				prevImg = dom.GetElementsByTagName(prevElement, "img")[0]
-			}
-
-			newImg := dom.GetElementsByTagName(tmpBody, "img")[0]
-			for _, attr := range prevImg.Attr {
-				if attr.Val == "" {
-					continue
-				}
-
-				if attr.Key == "src" || attr.Key == "srcset" || rxImgExtensions.MatchString(attr.Val) {
-					if dom.GetAttribute(newImg, attr.Key) == attr.Val {
-						continue
-					}
-
-					attrName := attr.Key
-					if dom.HasAttribute(newImg, attrName) {
-						attrName = "data-old-" + attrName
-					}
-
-					dom.SetAttribute(newImg, attrName, attr.Val)
-				}
-			}
-
-			dom.ReplaceChild(noscript.Parent, dom.FirstElementChild(tmpBody), prevElement)
+		// If needed, create attribute to mark it was noscript
+		if markNewDiv {
+			dom.SetAttribute(div, "data-obelisk-noscript", "true")
 		}
+
+		// Replace noscript with our new div
+		dom.ReplaceChild(noscript.Parent, div, noscript)
 	})
 }
 
@@ -545,4 +489,18 @@ func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node, base
 	newSrcset := strings.Join(newSets, ",")
 	dom.SetAttribute(node, "srcset", newSrcset)
 	return nil
+}
+
+func (arc *archiver) revertConvertedNoScript(doc *html.Node) {
+	divs := dom.GetElementsByTagName(doc, "div")
+	dom.ForEachNode(divs, func(div *html.Node, _ int) {
+		attr := dom.GetAttribute(div, "data-obelisk-noscript")
+		if attr != "true" {
+			return
+		}
+
+		noscript := dom.CreateElement("noscript")
+		dom.SetTextContent(noscript, dom.InnerHTML(div))
+		dom.ReplaceChild(div.Parent, noscript, div)
+	})
 }
