@@ -55,7 +55,7 @@ type archiver struct {
 }
 
 // Archive starts archival process for the specified request.
-func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
+func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, error) {
 	// Validate config
 	if cfg.MaxConcurrentDownload <= 0 {
 		cfg.MaxConcurrentDownload = 10
@@ -67,7 +67,7 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
 
 	// Validate request
 	if req.URL == "" {
-		return nil, fmt.Errorf("request url is not specified")
+		return nil, "", fmt.Errorf("request url is not specified")
 	}
 
 	// Create archiver
@@ -84,7 +84,7 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
 	// Make sure request URL valid
 	url, err := nurl.ParseRequestURI(req.URL)
 	if err != nil || url.Scheme == "" || url.Hostname() == "" {
-		return nil, fmt.Errorf("url \"%s\" is not valid", req.URL)
+		return nil, "", fmt.Errorf("url \"%s\" is not valid", req.URL)
 	}
 
 	// If needed download page from source URL
@@ -92,7 +92,7 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
 	if req.Input == nil {
 		resp, err := arc.downloadFile(url.String())
 		if err != nil {
-			return nil, fmt.Errorf("download failed: %w", err)
+			return nil, "", fmt.Errorf("download failed: %w", err)
 		}
 		defer resp.Body.Close()
 
@@ -103,14 +103,15 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
 	// Check the type of the downloaded file.
 	// If it's not HTML, just return it as it is.
 	if !strings.HasPrefix(contentType, "text/html") {
-		return ioutil.ReadAll(req.Input)
+		content, err := ioutil.ReadAll(req.Input)
+		return content, contentType, err
 	}
 
 	// If it's HTML process it
 	result, err := arc.processHTML(ctx, req.Input, url)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return []byte(result), nil
+	return []byte(result), contentType, nil
 }

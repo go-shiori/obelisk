@@ -17,7 +17,7 @@ func main() {
 	}
 
 	cfg := obelisk.Config{EnableLog: true}
-	result, err := obelisk.Archive(context.Background(), req, cfg)
+	result, _, err := obelisk.Archive(context.Background(), req, cfg)
 	checkError(err)
 
 	// Create destination file

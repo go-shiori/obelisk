@@ -154,7 +154,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 				logrus.Printf("archival started for %s\n", strURL)
 			}
 
-			result, err := obelisk.Archive(context.Background(), req, cfg)
+			result, contentType, err := obelisk.Archive(context.Background(), req, cfg)
 			if err != nil {
 				return err
 			}
@@ -166,7 +166,10 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 			} else {
 				fileName := outputFileName
 				if fileName == "" {
-					fileName = createFileName(url)
+					fileName = createFileName(url, contentType)
+					if useGzip {
+						fileName += ".gz"
+					}
 				}
 
 				f, err := os.Create(fp.Join(outputDir, fileName))

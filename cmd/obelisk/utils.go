@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"mime"
 	"net/http"
 	nurl "net/url"
 	"os"
@@ -86,15 +87,21 @@ func getDomainName(hostname string) string {
 	return strings.Join(parts[len(parts)-2:], ".")
 }
 
-func createFileName(url *nurl.URL) string {
+func createFileName(url *nurl.URL, contentType string) string {
 	// Prepare current time and domain name
 	now := time.Now().Format("2006-01-01-150405")
 	domainName := getDomainName(url.Hostname())
 	domainName = strings.ReplaceAll(domainName, ".", "-")
 
+	// Get file extension
+	extension := ""
+	if exts, _ := mime.ExtensionsByType(contentType); len(exts) > 0 {
+		extension = exts[0]
+	}
+
 	// If URL doesn't have any path just return time and domain
 	if url.Path == "" || url.Path == "/" {
-		return fmt.Sprintf("%s-%s", now, domainName)
+		return fmt.Sprintf("%s-%s%s", now, domainName, extension)
 	}
 
 	baseName := pth.Base(url.Path)
@@ -102,7 +109,7 @@ func createFileName(url *nurl.URL) string {
 		baseName = strings.Join(parts[:5], "-")
 	}
 
-	return fmt.Sprintf("%s-%s-%s", now, domainName, baseName)
+	return fmt.Sprintf("%s-%s-%s%s", now, domainName, baseName, extension)
 }
 
 func isDirectory(path string) bool {
