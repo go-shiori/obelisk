@@ -462,17 +462,9 @@ func (arc *archiver) processLinkNode(ctx context.Context, node *html.Node, baseU
 		return err
 	}
 
-	// Remove all attributes for this node. We do it in two loops,
-	// first to get attr names, then second to remove it. This is done
-	// because if we remove as we loop we might end up leaving some
-	// attributes.
-	attrNames := []string{}
-	for _, attr := range node.Attr {
-		attrNames = append(attrNames, attr.Key)
-	}
-
-	for _, name := range attrNames {
-		dom.RemoveAttribute(node, name)
+	// Remove all attributes for this node
+	for i := len(node.Attr) - 1; i >= 0; i-- {
+		dom.RemoveAttribute(node, node.Attr[i].Key)
 	}
 
 	// Convert <link> into <style>
