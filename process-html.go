@@ -45,7 +45,7 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	arc.removeLinkIntegrityAttr(doc)
 
 	// Find all nodes which might has subresource.
-	// A node might has subresource if it fulfills one of these criterias :
+	// A node might has subresource if it fulfills one of these criteria :
 	// - It has inline style;
 	// - It's link for icon or stylesheets;
 	// - It's tag name is either style, img, picture, figure, video, audio, source, iframe or object;

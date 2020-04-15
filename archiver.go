@@ -55,6 +55,7 @@ type archiver struct {
 }
 
 // Archive starts archival process for the specified request.
+// Returns the archival result, content type and error if there are any.
 func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, error) {
 	// Validate config
 	if cfg.MaxConcurrentDownload <= 0 {
