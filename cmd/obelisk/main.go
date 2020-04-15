@@ -161,11 +161,9 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 
 			// Prepare output
 			var output io.Writer
-			switch {
-			case len(urls) == 1 && !outputSpecified:
+			if len(urls) == 1 && !outputSpecified {
 				output = os.Stdout
-
-			default:
+			} else {
 				fileName := outputFileName
 				if fileName == "" {
 					fileName = createFileName(url)
