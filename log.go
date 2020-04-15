@@ -9,7 +9,10 @@ func (arc *archiver) logURL(url, parentURL string, isCached bool) {
 		return
 	}
 
-	fields := logrus.Fields{"cached": isCached}
+	fields := logrus.Fields{}
+	if isCached {
+		fields["cached"] = true
+	}
 	if arc.config.EnableVerboseLog {
 		fields["parent"] = parentURL
 	}
