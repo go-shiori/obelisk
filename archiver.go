@@ -25,7 +25,7 @@ var (
 type Config struct {
 	UserAgent             string
 	EnableLog             bool
-	LogParentURL          bool
+	EnableVerboseLog      bool
 	DisableJS             bool
 	DisableCSS            bool
 	DisableEmbeds         bool
@@ -81,8 +81,6 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
 		cookies: req.Cookies,
 	}
 
-	arc.log("Obelisk started")
-
 	// Make sure request URL valid
 	url, err := nurl.ParseRequestURI(req.URL)
 	if err != nil || url.Scheme == "" || url.Hostname() == "" {
@@ -114,6 +112,5 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, error) {
 		return nil, err
 	}
 
-	arc.log("Obelisk finished")
 	return []byte(result), nil
 }
