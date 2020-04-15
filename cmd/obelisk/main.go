@@ -150,7 +150,10 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 			}
 
 			// Start archival
-			logrus.Printf("archival started for %s\n", strURL)
+			if !disableLog || len(urls) > 1 {
+				logrus.Printf("archival started for %s\n", strURL)
+			}
+
 			result, err := obelisk.Archive(context.Background(), req, cfg)
 			if err != nil {
 				return err
@@ -189,7 +192,10 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 				return err
 			}
 
-			logrus.Printf("archival finished for %s\n", strURL)
+			if !disableLog || len(urls) > 1 {
+				logrus.Printf("archival finished for %s\n", strURL)
+			}
+
 			finishedURLs[strURL] = struct{}{}
 			return nil
 		}()
