@@ -78,19 +78,10 @@ func parseCookiesFile(path string) (map[string][]*http.Cookie, error) {
 	return mapCookies, nil
 }
 
-func getDomainName(hostname string) string {
-	parts := strings.Split(hostname, ".")
-	if len(parts) <= 2 {
-		return hostname
-	}
-
-	return strings.Join(parts[len(parts)-2:], ".")
-}
-
 func createFileName(url *nurl.URL, contentType string) string {
 	// Prepare current time and domain name
 	now := time.Now().Format("2006-01-01-150405")
-	domainName := getDomainName(url.Hostname())
+	domainName := strings.TrimPrefix(url.Hostname(), "www.")
 	domainName = strings.ReplaceAll(domainName, ".", "-")
 
 	// Get file extension
@@ -105,8 +96,8 @@ func createFileName(url *nurl.URL, contentType string) string {
 	}
 
 	baseName := pth.Base(url.Path)
-	if parts := strings.Split(baseName, "-"); len(parts) > 5 {
-		baseName = strings.Join(parts[:5], "-")
+	if parts := strings.Split(baseName, "-"); len(parts) > 4 {
+		baseName = strings.Join(parts[:4], "-")
 	}
 
 	return fmt.Sprintf("%s-%s-%s%s", now, domainName, baseName, extension)

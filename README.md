@@ -93,7 +93,8 @@ There are some CLI behavior that I think need to be explained more here :
 	.developers.google.com	TRUE	/	FALSE	1642167486	KEY	VALUE
 	```
 
-- If `--output` flag is not specified and there is only one URL to process (either from input file or from CLI arguments) then the default output will be `stdout`. However, if there are more than one URL then Obelisk will generate file name for the archive.
+- If `--output` flag is not specified then Obelisk will generate file name for the archive and save it in current working directory.
+- If `--output` flag is set to `-` and there is only one URL to process (either from input file or from CLI arguments) then the default output will be `stdout`.
 - If `--output` flag is specified but there are more than one URL to process, Obelisk will generate file name for the archive, but keep using the directory from the specified output path.
 - If `--output` flag is specified but it sets to an existing directory, Obelisk will also generate file name for the archive.
 

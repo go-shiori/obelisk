@@ -9,6 +9,7 @@ import (
 	nurl "net/url"
 	"os"
 	fp "path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-shiori/obelisk"
@@ -53,7 +54,6 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	// Parse flags
 	inputPath, _ := cmd.Flags().GetString("input")
 	outputPath, _ := cmd.Flags().GetString("output")
-	outputSpecified := cmd.Flags().Changed("output")
 	cookiesFilePath, _ := cmd.Flags().GetString("load-cookies")
 
 	userAgent, _ := cmd.Flags().GetString("user-agent")
@@ -83,10 +83,12 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no url to process")
 	}
 
-	// Prepare output name and dir
+	// Prepare output target
 	outputDir := ""
 	outputFileName := ""
-	if outputSpecified {
+	useStdout := outputPath == "-" && len(urls) == 1
+
+	if outputPath != "" && !useStdout {
 		if isDirectory(outputPath) {
 			outputDir = outputPath
 		} else {
@@ -145,11 +147,12 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 			// Create request
 			var reqCookies []*http.Cookie
 			if len(cookiesMap) != 0 {
-				hostName := url.Hostname()
-				domainName := getDomainName(hostName)
-				reqCookies = append(reqCookies, cookiesMap[hostName]...)
-				reqCookies = append(reqCookies, cookiesMap["."+hostName]...)
-				reqCookies = append(reqCookies, cookiesMap["."+domainName]...)
+				parts := strings.Split(url.Hostname(), ".")
+				for i := 0; i < len(parts)-1; i++ {
+					domainName := strings.Join(parts[i:], ".")
+					reqCookies = append(reqCookies, cookiesMap[domainName]...)
+					reqCookies = append(reqCookies, cookiesMap["."+domainName]...)
+				}
 			}
 
 			req := obelisk.Request{
@@ -169,7 +172,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 
 			// Prepare output
 			var output io.Writer
-			if len(urls) == 1 && !outputSpecified {
+			if useStdout {
 				output = os.Stdout
 			} else {
 				fileName := outputFileName
