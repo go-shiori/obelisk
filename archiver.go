@@ -52,6 +52,7 @@ type archiver struct {
 
 	config  Config
 	cookies []*http.Cookie
+	rootURL string
 }
 
 // Archive starts archival process for the specified request.
@@ -71,7 +72,19 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, erro
 		return nil, "", fmt.Errorf("request url is not specified")
 	}
 
+	// Make sure request URL valid
+	url, err := nurl.ParseRequestURI(req.URL)
+	if err != nil || url.Scheme == "" || url.Hostname() == "" {
+		return nil, "", fmt.Errorf("url \"%s\" is not valid", req.URL)
+	}
+
 	// Create archiver
+	rootURL := *url
+	rootURL.Fragment = ""
+	for key := range rootURL.Query() {
+		rootURL.Query().Del(key)
+	}
+
 	arc := &archiver{
 		ctx:          ctx,
 		cache:        make(map[string][]byte),
@@ -80,12 +93,7 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, erro
 
 		config:  cfg,
 		cookies: req.Cookies,
-	}
-
-	// Make sure request URL valid
-	url, err := nurl.ParseRequestURI(req.URL)
-	if err != nil || url.Scheme == "" || url.Hostname() == "" {
-		return nil, "", fmt.Errorf("url \"%s\" is not valid", req.URL)
+		rootURL: rootURL.String(),
 	}
 
 	// If needed download page from source URL

@@ -27,6 +27,10 @@ func (arc *archiver) downloadFile(url string) (*http.Response, error) {
 	}
 
 	req.Header.Set("User-Agent", arc.config.UserAgent)
+	if url != arc.rootURL {
+		req.Header.Set("Referer", arc.rootURL)
+	}
+
 	for _, cookie := range arc.cookies {
 		req.AddCookie(cookie)
 	}
