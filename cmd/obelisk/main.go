@@ -9,6 +9,7 @@ import (
 	nurl "net/url"
 	"os"
 	fp "path/filepath"
+	"time"
 
 	"github.com/go-shiori/obelisk"
 	"github.com/sirupsen/logrus"
@@ -25,6 +26,8 @@ func main() {
 
 	cmd.Flags().StringP("input", "i", "", "path to file which contains URLs")
 	cmd.Flags().StringP("output", "o", "", "path to save archival result")
+	cmd.Flags().StringP("load-cookies", "c", "", "path to Netscape cookie file")
+
 	cmd.Flags().StringP("user-agent", "u", "", "set custom user agent")
 	cmd.Flags().BoolP("gzip", "z", false, "gzip archival result")
 	cmd.Flags().BoolP("quiet", "q", false, "disable logging")
@@ -35,8 +38,9 @@ func main() {
 	cmd.Flags().Bool("no-embeds", false, "remove embedded elements (e.g iframe)")
 	cmd.Flags().Bool("no-medias", false, "remove media elements (e.g img, audio)")
 
+	cmd.Flags().IntP("timeout", "t", 60, "maximum time (in second) before request timeout")
+	cmd.Flags().Bool("insecure", false, "skip X.509 (TLS) certificate verification")
 	cmd.Flags().Int64("max-concurrent-download", 10, "max concurrent download at a time")
-	cmd.Flags().StringP("load-cookies", "c", "", "path to Netscape cookie file")
 
 	// Execute
 	err := cmd.Execute()
@@ -62,6 +66,8 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	disableEmbeds, _ := cmd.Flags().GetBool("no-embeds")
 	disableMedias, _ := cmd.Flags().GetBool("no-medias")
 
+	timeout, _ := cmd.Flags().GetInt("timeout")
+	skipTLSVerification, _ := cmd.Flags().GetBool("insecure")
 	maxConcurrentDownload, _ := cmd.Flags().GetInt64("max-concurrent-download")
 
 	// Create list of URLs
@@ -114,6 +120,8 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		DisableEmbeds: disableEmbeds,
 		DisableMedias: disableMedias,
 
+		RequestTimeout:        time.Duration(timeout) * time.Second,
+		SkipTLSVerification:   skipTLSVerification,
 		MaxConcurrentDownload: maxConcurrentDownload,
 	}
 

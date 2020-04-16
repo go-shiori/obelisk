@@ -2,6 +2,7 @@ package obelisk
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	nurl "net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/semaphore"
 )
@@ -23,13 +25,17 @@ var (
 
 // Config is configuration for archival process.
 type Config struct {
-	UserAgent             string
-	EnableLog             bool
-	EnableVerboseLog      bool
-	DisableJS             bool
-	DisableCSS            bool
-	DisableEmbeds         bool
-	DisableMedias         bool
+	UserAgent        string
+	EnableLog        bool
+	EnableVerboseLog bool
+
+	DisableJS     bool
+	DisableCSS    bool
+	DisableEmbeds bool
+	DisableMedias bool
+
+	RequestTimeout        time.Duration
+	SkipTLSVerification   bool
 	MaxConcurrentDownload int64
 }
 
@@ -50,9 +56,10 @@ type archiver struct {
 	contentTypes map[string]string
 	dlSemaphore  *semaphore.Weighted
 
-	config  Config
-	cookies []*http.Cookie
-	rootURL string
+	config     Config
+	rootURL    string
+	cookies    []*http.Cookie
+	httpClient *http.Client
 }
 
 // Archive starts archival process for the specified request.
@@ -85,15 +92,26 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, erro
 		rootURL.Query().Del(key)
 	}
 
+	httpClient := &http.Client{
+		Timeout: cfg.RequestTimeout,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: cfg.SkipTLSVerification,
+			},
+		},
+		Jar: nil,
+	}
+
 	arc := &archiver{
 		ctx:          ctx,
 		cache:        make(map[string][]byte),
 		contentTypes: make(map[string]string),
 		dlSemaphore:  semaphore.NewWeighted(cfg.MaxConcurrentDownload),
 
-		config:  cfg,
-		cookies: req.Cookies,
-		rootURL: rootURL.String(),
+		config:     cfg,
+		rootURL:    rootURL.String(),
+		cookies:    req.Cookies,
+		httpClient: httpClient,
 	}
 
 	// If needed download page from source URL
@@ -123,4 +141,27 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, erro
 	}
 
 	return []byte(result), contentType, nil
+}
+
+func (arc *archiver) downloadFile(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", arc.config.UserAgent)
+	if url != arc.rootURL {
+		req.Header.Set("Referer", arc.rootURL)
+	}
+
+	for _, cookie := range arc.cookies {
+		req.AddCookie(cookie)
+	}
+
+	resp, err := arc.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
