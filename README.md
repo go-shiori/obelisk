@@ -18,7 +18,7 @@ Obelisk is a Go package and CLI tool for saving web page as single HTML file, wi
 
 - Embeds all resources (e.g. CSS, image, JavaScript, etc) producing a single HTML5 document that is easy to store and share.
 - In case the submitted URL is not HTML (for example a PDF page), Obelisk will still save it as it is.
-- Downloading for each assets is done concurrently, which make the archival process for a web page is quite fast.
+- Downloading each assets are done concurrently, which make the archival process for a web page is quite fast.
 - Accepts cookies, useful for pages that need login or article behind paywall.
 
 ## As Go package
@@ -35,11 +35,11 @@ Next, include Obelisk in your application :
 import "github.com/go-shiori/obelisk"
 ```
 
-Now you can use Obelisk archival feature for your application's use case. For basic usage you can check the [example](https://github.com/go-shiori/obelisk/blob/master/examples/basic.go).
+Now you can use Obelisk archival feature for your application. For basic usage you can check the [example](https://github.com/go-shiori/obelisk/blob/master/examples/basic.go).
 
 ## As CLI application
 
-You can download the latest version of Obelisk from release page. To build from source, make sure you use `go >= 1.13` then run following commands :
+You can download the latest version of Obelisk from [release page](https://github.com/go-shiori/obelisk/releases). To build from source, make sure you use `go >= 1.13` then run following commands :
 
 ```
 go get -u -v github.com/go-shiori/obelisk/cmd/obelisk
@@ -73,7 +73,7 @@ Flags:
 
 There are some CLI behavior that I think need to be explained more here :
 
-1. The `--input` flag accepts text file that contains list of urls that look like this :
+- The `--input` flag accepts text file that contains list of urls that look like this :
 
     ```
 	http://www.domain1.com/some/path
@@ -81,7 +81,7 @@ There are some CLI behavior that I think need to be explained more here :
 	http://www.domain3.com/some/path
 	```
 
-2. The `--load-cookies` flag accepts Netscape cookie file that usually look like this :
+- The `--load-cookies` flag accepts Netscape cookie file that usually look like this :
 
     ```
 	# Netscape HTTP Cookie File
@@ -93,30 +93,30 @@ There are some CLI behavior that I think need to be explained more here :
 	.developers.google.com	TRUE	/	FALSE	1642167486	KEY	VALUE
 	```
 
-3. If `--output` flag doesn't specified and there is only one URL to process (either from input file or from CLI arguments) then the default output will be `stdout`. However, if there are more than one URL then Obelisk will generate file name for the archive.
-4. If `--output` flag is specified but there are more than one URL to process, Obelisk will generate file name for the archive, but keep using the directory from the specified output path.
-5. If `--output` flag is specified but it sets to an existing directory, Obelisk will also generate file name for the archive.
+- If `--output` flag is not specified and there is only one URL to process (either from input file or from CLI arguments) then the default output will be `stdout`. However, if there are more than one URL then Obelisk will generate file name for the archive.
+- If `--output` flag is specified but there are more than one URL to process, Obelisk will generate file name for the archive, but keep using the directory from the specified output path.
+- If `--output` flag is specified but it sets to an existing directory, Obelisk will also generate file name for the archive.
 
 ## F.A.Q
 
-- **Why the name is Obelisk ?**
+**Why the name is Obelisk ?**
 
-    It's inspired by Monolith, therefore it's Obelisk.
+It's inspired by Monolith, therefore it's Obelisk.
 
-- **How does it compare to WARC ?**
+**How does it compare to WARC ?**
 
-    My WARC package uses `bolt` database to contain archival result, which make it hard to share and view. I also think my code in WARC is not really easy to understand, so I often confused when I try to add additionals feature or refactoring it.
+My WARC package uses `bolt` database to contain archival result, which make it hard to share and view. I also think my code in WARC is not really easy to understand, so I often confused when I try to add additional feature or refactoring it.
 
-- **How does it compare to Monolith ?**
+**How does it compare to Monolith ?**
 
-    1. Both embeds all resource to HTML file, mostly using base64 data URL. The difference is Obelisk will use inline `<script>` and `<style>` for external JavaScript and CSS files. This is done because in many page the browser will struggles to load JavaScript that encoded into data URL. Inlining scripts and styles also make archival result smaller since we don't encode them using base64.
-	2. In Obelisk all request to external URL is disabled by default using Content Security Policy, while in Monolith we need to specify it manually. This is done because in my opinion archive shouldn't need and shouldn't be able to send request to external resources.
-	3. In Obelisk downloading assets is done concurrently. Thanks to this, Obelisk (most of the time) will be faster than Monolith when archiving a web page.
+- Both embeds all resources to HTML file, mostly using base64 data URL. The difference is Obelisk will use inline `<script>` and `<style>` for external JavaScript and CSS files. This is done because in many page the browser will struggles to load JavaScript that encoded into data URL. Inlining scripts and styles also make archival result smaller since we don't encode them using base64.
+- In Obelisk all request to external URL is disabled by default using Content Security Policy, while in Monolith we need to specify it manually. This is done because in my opinion archive shouldn't need and shouldn't be able to send request to external resources.
+- In Obelisk downloading assets are done concurrently. Thanks to this, Obelisk (most of the time) will be faster than Monolith when archiving a web page.
 
-- **Why not just contribute to Monolith ?**
+**Why not just contribute to Monolith ?**
 
-    1. I don't have any knowledge about Rust. I do want to learn it though.
-	2. I have a plan to update [Shiori](https://github.com/go-shiori/shiori), so I need a Go package for archiving web page.
+- I don't have any knowledge about Rust. I do want to learn it though.
+- I have a plan to update [Shiori](https://github.com/go-shiori/shiori), so I need a Go package for archiving web page.
 
 ## Attributions
 
