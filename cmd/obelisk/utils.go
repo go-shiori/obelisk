@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func parseInputFile(path string) ([]string, error) {
+func parseInputFile(path string) (map[string]string, error) {
 	// Open file
 	f, err := os.Open(path)
 	if err != nil {
@@ -22,7 +22,7 @@ func parseInputFile(path string) ([]string, error) {
 	defer f.Close()
 
 	// Fetch each line from file
-	urls := []string{}
+	result := make(map[string]string)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		text := scanner.Text()
@@ -31,10 +31,15 @@ func parseInputFile(path string) ([]string, error) {
 			continue
 		}
 
-		urls = append(urls, text)
+		parts := strings.Split(text, "\t")
+		if len(parts) == 2 {
+			result[parts[0]] = parts[1]
+		} else {
+			result[parts[0]] = ""
+		}
 	}
 
-	return urls, nil
+	return result, nil
 }
 
 func parseCookiesFile(path string) (map[string][]*http.Cookie, error) {

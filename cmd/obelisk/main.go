@@ -70,36 +70,52 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	skipTLSVerification, _ := cmd.Flags().GetBool("insecure")
 	maxConcurrentDownload, _ := cmd.Flags().GetInt64("max-concurrent-download")
 
-	// Create list of URLs
-	urls, err := args, error(nil)
-	if inputPath != "" {
-		urls, err = parseInputFile(inputPath)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(urls) == 0 {
-		return fmt.Errorf("no url to process")
-	}
-
 	// Prepare output target
 	outputDir := ""
 	outputFileName := ""
-	useStdout := outputPath == "-" && len(urls) == 1
+	useStdout := outputPath == "-"
 
 	if outputPath != "" && !useStdout {
 		if isDirectory(outputPath) {
 			outputDir = outputPath
 		} else {
 			outputDir = fp.Dir(outputPath)
-			if len(urls) == 1 {
-				outputFileName = fp.Base(outputPath)
-			}
+			outputFileName = fp.Base(outputPath)
 		}
 
 		// Make sure output dir exists
 		os.MkdirAll(outputDir, os.ModePerm)
+	}
+
+	// Create initial list of URLs
+	var err error
+	urls := make(map[string]string)
+	for _, arg := range args {
+		urls[arg] = ""
+	}
+
+	// Parse input file
+	if inputPath != "" {
+		newURLs, err := parseInputFile(inputPath)
+		if err != nil {
+			return err
+		}
+
+		for url, dstPath := range newURLs {
+			urls[url] = dstPath
+		}
+	}
+
+	// Depending of urls count, there are some thing to do
+	switch len(urls) {
+	case 0:
+		return fmt.Errorf("no url to process")
+	case 1:
+		for url := range urls {
+			urls[url] = outputFileName
+		}
+	default:
+		useStdout = false
 	}
 
 	// Read cookies file
@@ -130,7 +146,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	// Process each url
 	finishedURLs := make(map[string]struct{})
 
-	for i, strURL := range urls {
+	for strURL, fileName := range urls {
 		err = func() error {
 			// Make sure this URL hasn't been processed
 			if _, finished := finishedURLs[strURL]; finished {
@@ -175,7 +191,6 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 			if useStdout {
 				output = os.Stdout
 			} else {
-				fileName := outputFileName
 				if fileName == "" {
 					fileName = createFileName(url, contentType)
 					if useGzip {
@@ -217,7 +232,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		}
 
 		// Create blank space separator to make it easier to see logs
-		if i < len(urls)-1 && !disableLog {
+		if !disableLog {
 			fmt.Println()
 		}
 	}
