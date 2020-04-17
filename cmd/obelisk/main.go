@@ -111,8 +111,10 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	case 0:
 		return fmt.Errorf("no url to process")
 	case 1:
-		for url := range urls {
-			urls[url] = outputFileName
+		for url, fileName := range urls {
+			if fileName == "" && outputFileName != "" {
+				urls[url] = outputFileName
+			}
 		}
 	default:
 		useStdout = false
