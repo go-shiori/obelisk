@@ -129,8 +129,10 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Create archiver config
-	cfg := obelisk.Config{
+	// Create archiver
+	archiver := obelisk.Archiver{
+		Cache: make(map[string]obelisk.Asset),
+
 		UserAgent:        userAgent,
 		EnableLog:        !disableLog,
 		EnableVerboseLog: !disableLog && useVerboseLog,
@@ -144,6 +146,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		SkipTLSVerification:   skipTLSVerification,
 		MaxConcurrentDownload: maxConcurrentDownload,
 	}
+	archiver.Validate()
 
 	// Process each url
 	finishedURLs := make(map[string]struct{})
@@ -183,7 +186,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 				logrus.Printf("archival started for %s\n", strURL)
 			}
 
-			result, contentType, err := obelisk.Archive(context.Background(), req, cfg)
+			result, contentType, err := archiver.Archive(context.Background(), req)
 			if err != nil {
 				return err
 			}

@@ -16,15 +16,30 @@ import (
 )
 
 var (
-	// DefaultConfig is the default configuration for archiver.
-	DefaultConfig = Config{}
-
 	// DefaultUserAgent is the default user agent to use, which is Chrome's.
 	DefaultUserAgent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0"
 )
 
-// Config is configuration for archival process.
-type Config struct {
+// Request is data of archival request.
+type Request struct {
+	Input   io.Reader
+	URL     string
+	Cookies []*http.Cookie
+}
+
+// Asset is asset that used in a web page.
+type Asset struct {
+	Data        []byte
+	ContentType string
+}
+
+// Archiver is the core of obelisk, which used to download a
+// web page then embeds its assets.
+type Archiver struct {
+	sync.RWMutex
+
+	Cache map[string]Asset
+
 	UserAgent        string
 	EnableLog        bool
 	EnableVerboseLog bool
@@ -37,41 +52,47 @@ type Config struct {
 	RequestTimeout        time.Duration
 	SkipTLSVerification   bool
 	MaxConcurrentDownload int64
+
+	isValidated bool
+	cookies     []*http.Cookie
+	httpClient  *http.Client
+	dlSemaphore *semaphore.Weighted
 }
 
-// Request is data of archival request.
-type Request struct {
-	Input   io.Reader
-	URL     string
-	Cookies []*http.Cookie
-}
+// Validate prepares Archiver to make sure its configurations
+// are valid and ready to use. Must be run at least once before
+// archival started.
+func (arc *Archiver) Validate() {
+	if arc.Cache == nil {
+		arc.Cache = make(map[string]Asset)
+	}
 
-// archiver is the core of obelisk, which used to download a
-// web page then embeds its assets.
-type archiver struct {
-	sync.RWMutex
+	if arc.UserAgent == "" {
+		arc.UserAgent = DefaultUserAgent
+	}
 
-	ctx          context.Context
-	cache        map[string][]byte
-	contentTypes map[string]string
-	dlSemaphore  *semaphore.Weighted
+	if arc.MaxConcurrentDownload <= 0 {
+		arc.MaxConcurrentDownload = 10
+	}
 
-	config     Config
-	rootURL    string
-	cookies    []*http.Cookie
-	httpClient *http.Client
+	arc.isValidated = true
+	arc.dlSemaphore = semaphore.NewWeighted(arc.MaxConcurrentDownload)
+	arc.httpClient = &http.Client{
+		Timeout: arc.RequestTimeout,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: arc.SkipTLSVerification,
+			},
+		},
+	}
 }
 
 // Archive starts archival process for the specified request.
 // Returns the archival result, content type and error if there are any.
-func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, error) {
-	// Validate config
-	if cfg.MaxConcurrentDownload <= 0 {
-		cfg.MaxConcurrentDownload = 10
-	}
-
-	if cfg.UserAgent == "" {
-		cfg.UserAgent = DefaultUserAgent
+func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, error) {
+	// Make sure archiver has been validated
+	if !arc.isValidated {
+		return nil, "", fmt.Errorf("archiver hasn't been validated")
 	}
 
 	// Validate request
@@ -79,39 +100,9 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, erro
 		return nil, "", fmt.Errorf("request url is not specified")
 	}
 
-	// Make sure request URL valid
 	url, err := nurl.ParseRequestURI(req.URL)
 	if err != nil || url.Scheme == "" || url.Hostname() == "" {
 		return nil, "", fmt.Errorf("url \"%s\" is not valid", req.URL)
-	}
-
-	// Create archiver
-	rootURL := *url
-	rootURL.Fragment = ""
-	for key := range rootURL.Query() {
-		rootURL.Query().Del(key)
-	}
-
-	httpClient := &http.Client{
-		Timeout: cfg.RequestTimeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: cfg.SkipTLSVerification,
-			},
-		},
-		Jar: nil,
-	}
-
-	arc := &archiver{
-		ctx:          ctx,
-		cache:        make(map[string][]byte),
-		contentTypes: make(map[string]string),
-		dlSemaphore:  semaphore.NewWeighted(cfg.MaxConcurrentDownload),
-
-		config:     cfg,
-		rootURL:    rootURL.String(),
-		cookies:    req.Cookies,
-		httpClient: httpClient,
 	}
 
 	// If needed download page from source URL
@@ -143,17 +134,13 @@ func Archive(ctx context.Context, req Request, cfg Config) ([]byte, string, erro
 	return []byte(result), contentType, nil
 }
 
-func (arc *archiver) downloadFile(url string) (*http.Response, error) {
+func (arc *Archiver) downloadFile(url string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", arc.config.UserAgent)
-	if url != arc.rootURL {
-		req.Header.Set("Referer", arc.rootURL)
-	}
-
+	req.Header.Set("User-Agent", arc.UserAgent)
 	for _, cookie := range arc.cookies {
 		req.AddCookie(cookie)
 	}

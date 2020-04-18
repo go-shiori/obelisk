@@ -12,7 +12,7 @@ import (
 
 var errSkippedURL = errors.New("skip processing url")
 
-func (arc *archiver) processURL(ctx context.Context, url string, parentURL string, embedded ...bool) ([]byte, string, error) {
+func (arc *Archiver) processURL(ctx context.Context, url string, parentURL string, embedded ...bool) ([]byte, string, error) {
 	// Parse embedded value
 	isEmbedded := len(embedded) != 0 && embedded[0]
 
@@ -31,13 +31,12 @@ func (arc *archiver) processURL(ctx context.Context, url string, parentURL strin
 
 	// Check in cache to see if this URL already processed
 	arc.RLock()
-	cache, cacheExist := arc.cache[url]
-	contentType, contentTypeExist := arc.contentTypes[url]
+	cache, cacheExist := arc.Cache[url]
 	arc.RUnlock()
 
-	if cacheExist && contentTypeExist {
+	if cacheExist {
 		arc.logURL(url, parentURL, true)
-		return cache, contentType, nil
+		return cache.Data, cache.ContentType, nil
 	}
 
 	// Download the resource, use semaphore to limit concurrent downloads
@@ -55,7 +54,7 @@ func (arc *archiver) processURL(ctx context.Context, url string, parentURL strin
 	defer resp.Body.Close()
 
 	// Get content type
-	contentType = resp.Header.Get("Content-Type")
+	contentType := resp.Header.Get("Content-Type")
 	contentType = strings.TrimSpace(contentType)
 	if contentType == "" {
 		contentType = "text/plain"
@@ -91,8 +90,10 @@ func (arc *archiver) processURL(ctx context.Context, url string, parentURL strin
 
 	// Save data URL to cache
 	arc.Lock()
-	arc.cache[url] = bodyContent
-	arc.contentTypes[url] = contentType
+	arc.Cache[url] = Asset{
+		Data:        bodyContent,
+		ContentType: contentType,
+	}
 	arc.Unlock()
 
 	return bodyContent, contentType, nil

@@ -21,7 +21,7 @@ var (
 	rxB64DataURL      = regexp.MustCompile(`(?i)^data:\s*([^\s;,]+)\s*;\s*base64\s*`)
 )
 
-func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
+func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
 	// Parse input into HTML document
 	doc, err := html.Parse(input)
 	if err != nil {
@@ -116,7 +116,7 @@ func (arc *archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 // setContentSecurityPolicy prevent browsers from requesting any remote
 // resources by setting Content-Security-Policy to only allow from
 // inline element and data URL.
-func (arc *archiver) setContentSecurityPolicy(doc *html.Node) {
+func (arc *Archiver) setContentSecurityPolicy(doc *html.Node) {
 	// Remove existing CSP
 	for _, meta := range dom.GetElementsByTagName(doc, "meta") {
 		httpEquiv := dom.GetAttribute(meta, "http-equiv")
@@ -131,19 +131,19 @@ func (arc *archiver) setContentSecurityPolicy(doc *html.Node) {
 		"connect-src 'none';",
 	}
 
-	if arc.config.DisableJS {
+	if arc.DisableJS {
 		policies = append(policies, "script-src 'none';")
 	}
 
-	if arc.config.DisableCSS {
+	if arc.DisableCSS {
 		policies = append(policies, "style-src 'none';")
 	}
 
-	if arc.config.DisableEmbeds {
+	if arc.DisableEmbeds {
 		policies = append(policies, "frame-src 'none'; child-src 'none';")
 	}
 
-	if arc.config.DisableMedias {
+	if arc.DisableMedias {
 		policies = append(policies, "image-src 'none'; media-src 'none';")
 	}
 
@@ -165,8 +165,8 @@ func (arc *archiver) setContentSecurityPolicy(doc *html.Node) {
 }
 
 // applyConfiguration removes or replace elements following the configuration.
-func (arc *archiver) applyConfiguration(doc *html.Node) {
-	if arc.config.DisableJS {
+func (arc *Archiver) applyConfiguration(doc *html.Node) {
+	if arc.DisableJS {
 		// Remove script tags
 		scripts := dom.GetAllNodesWithTag(doc, "script")
 		dom.RemoveNodes(scripts, nil)
@@ -183,7 +183,7 @@ func (arc *archiver) applyConfiguration(doc *html.Node) {
 		arc.convertNoScriptToDiv(doc, false)
 	}
 
-	if arc.config.DisableCSS {
+	if arc.DisableCSS {
 		// Remove style tags
 		styles := dom.GetAllNodesWithTag(doc, "style")
 		dom.RemoveNodes(styles, nil)
@@ -196,19 +196,19 @@ func (arc *archiver) applyConfiguration(doc *html.Node) {
 		}
 	}
 
-	if arc.config.DisableEmbeds {
+	if arc.DisableEmbeds {
 		embeds := dom.GetAllNodesWithTag(doc, "object", "embed", "iframe")
 		dom.RemoveNodes(embeds, nil)
 	}
 
-	if arc.config.DisableMedias {
+	if arc.DisableMedias {
 		medias := dom.GetAllNodesWithTag(doc, "img", "picture", "figure", "video", "audio", "source")
 		dom.RemoveNodes(medias, nil)
 	}
 }
 
 // convertNoScriptToDiv convert all noscript to div element.
-func (arc *archiver) convertNoScriptToDiv(doc *html.Node, markNewDiv bool) {
+func (arc *Archiver) convertNoScriptToDiv(doc *html.Node, markNewDiv bool) {
 	noscripts := dom.GetElementsByTagName(doc, "noscript")
 	dom.ForEachNode(noscripts, func(noscript *html.Node, _ int) {
 		// Parse noscript content
@@ -238,7 +238,7 @@ func (arc *archiver) convertNoScriptToDiv(doc *html.Node, markNewDiv bool) {
 // convertLazyImageAttrs convert attributes data-src and data-srcset
 // which often found in lazy-loaded images and pictures, into basic attribute
 // src and srcset, so images that can be loaded without JS.
-func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
+func (arc *Archiver) convertLazyImageAttrs(doc *html.Node) {
 	imageNodes := dom.GetAllNodesWithTag(doc, "img", "picture", "figure")
 	dom.ForEachNode(imageNodes, func(elem *html.Node, _ int) {
 		src := dom.GetAttribute(elem, "src")
@@ -327,7 +327,7 @@ func (arc *archiver) convertLazyImageAttrs(doc *html.Node) {
 // convertRelativeURLs converts all relative URL in document into absolute URL.
 // We do this for a, img, picture, figure, video, audio, source, link,
 // embed, iframe and object.
-func (arc *archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
+func (arc *Archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 	// Prepare nodes and methods
 	as := dom.GetElementsByTagName(doc, "a")
 	links := dom.GetElementsByTagName(doc, "link")
@@ -374,14 +374,14 @@ func (arc *archiver) convertRelativeURLs(doc *html.Node, baseURL *nurl.URL) {
 }
 
 // removeLinkIntegrityAttrs removes integrity attributes from link tags.
-func (arc *archiver) removeLinkIntegrityAttr(doc *html.Node) {
+func (arc *Archiver) removeLinkIntegrityAttr(doc *html.Node) {
 	for _, link := range dom.GetElementsByTagName(doc, "link") {
 		dom.RemoveAttribute(link, "integrity")
 	}
 }
 
 // removeComments find all comments in document then remove it.
-func (arc *archiver) removeComments(doc *html.Node) {
+func (arc *Archiver) removeComments(doc *html.Node) {
 	// Find all comments
 	var comments []*html.Node
 	var finder func(*html.Node)
@@ -404,7 +404,7 @@ func (arc *archiver) removeComments(doc *html.Node) {
 	dom.RemoveNodes(comments, nil)
 }
 
-func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrName string, baseURL *nurl.URL) error {
+func (arc *Archiver) processURLNode(ctx context.Context, node *html.Node, attrName string, baseURL *nurl.URL) error {
 	if !dom.HasAttribute(node, attrName) {
 		return nil
 	}
@@ -424,7 +424,7 @@ func (arc *archiver) processURLNode(ctx context.Context, node *html.Node, attrNa
 	return nil
 }
 
-func (arc *archiver) processStyleAttr(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+func (arc *Archiver) processStyleAttr(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
 	style := dom.GetAttribute(node, "style")
 	newStyle, err := arc.processCSS(ctx, strings.NewReader(style), baseURL)
 	if err == nil {
@@ -434,7 +434,7 @@ func (arc *archiver) processStyleAttr(ctx context.Context, node *html.Node, base
 	return err
 }
 
-func (arc *archiver) processStyleNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+func (arc *Archiver) processStyleNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
 	style := dom.TextContent(node)
 	newStyle, err := arc.processCSS(ctx, strings.NewReader(style), baseURL)
 	if err == nil {
@@ -444,7 +444,7 @@ func (arc *archiver) processStyleNode(ctx context.Context, node *html.Node, base
 	return err
 }
 
-func (arc *archiver) processLinkNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+func (arc *Archiver) processLinkNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
 	if !dom.HasAttribute(node, "href") {
 		return nil
 	}
@@ -474,7 +474,7 @@ func (arc *archiver) processLinkNode(ctx context.Context, node *html.Node, baseU
 	return nil
 }
 
-func (arc *archiver) processScriptNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+func (arc *Archiver) processScriptNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
 	if !dom.HasAttribute(node, "src") {
 		return nil
 	}
@@ -493,7 +493,7 @@ func (arc *archiver) processScriptNode(ctx context.Context, node *html.Node, bas
 	return nil
 }
 
-func (arc *archiver) processEmbedNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+func (arc *Archiver) processEmbedNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
 	attrName := "src"
 	if dom.TagName(node) == "object" {
 		attrName = "data"
@@ -518,7 +518,7 @@ func (arc *archiver) processEmbedNode(ctx context.Context, node *html.Node, base
 	return nil
 }
 
-func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+func (arc *Archiver) processMediaNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
 	err := arc.processURLNode(ctx, node, "src", baseURL)
 	if err != nil {
 		return err
@@ -558,7 +558,7 @@ func (arc *archiver) processMediaNode(ctx context.Context, node *html.Node, base
 	return nil
 }
 
-func (arc *archiver) revertConvertedNoScript(doc *html.Node) {
+func (arc *Archiver) revertConvertedNoScript(doc *html.Node) {
 	divs := dom.GetElementsByTagName(doc, "div")
 	dom.ForEachNode(divs, func(div *html.Node, _ int) {
 		attr := dom.GetAttribute(div, "data-obelisk-noscript")

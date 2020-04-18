@@ -4,8 +4,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (arc *archiver) logURL(url, parentURL string, isCached bool) {
-	if !arc.config.EnableLog {
+func (arc *Archiver) logURL(url, parentURL string, isCached bool) {
+	if !arc.EnableLog {
 		return
 	}
 
@@ -13,7 +13,7 @@ func (arc *archiver) logURL(url, parentURL string, isCached bool) {
 	if isCached {
 		fields["cached"] = true
 	}
-	if arc.config.EnableVerboseLog {
+	if arc.EnableVerboseLog {
 		fields["parent"] = parentURL
 	}
 
