@@ -230,7 +230,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		}()
 
 		if err != nil {
-			return err
+			logrus.Warnln(err)
 		}
 
 		// Create blank space separator to make it easier to see logs
