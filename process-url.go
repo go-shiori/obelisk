@@ -46,7 +46,7 @@ func (arc *Archiver) processURL(ctx context.Context, url string, parentURL strin
 		return nil, "", nil
 	}
 
-	resp, err := arc.downloadFile(url)
+	resp, err := arc.downloadFile(url, parentURL)
 	arc.dlSemaphore.Release(1)
 	if err != nil {
 		return nil, "", fmt.Errorf("download failed: %w", err)

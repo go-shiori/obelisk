@@ -108,7 +108,7 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	// If needed download page from source URL
 	contentType := "text/html"
 	if req.Input == nil {
-		resp, err := arc.downloadFile(url.String())
+		resp, err := arc.downloadFile(url.String(), "")
 		if err != nil {
 			return nil, "", fmt.Errorf("download failed: %w", err)
 		}
@@ -134,13 +134,17 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	return []byte(result), contentType, nil
 }
 
-func (arc *Archiver) downloadFile(url string) (*http.Response, error) {
+func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("User-Agent", arc.UserAgent)
+	if parentURL != "" {
+		req.Header.Set("Referer", parentURL)
+	}
+
 	for _, cookie := range arc.cookies {
 		req.AddCookie(cookie)
 	}
