@@ -16,8 +16,10 @@ func main() {
 		URL: "https://www.globalwitness.org/en/blog/how-the-rsf-got-their-4x4-technicals-the-open-source-intelligence-techniques-behind-our-sudan-expos%C3%A9",
 	}
 
-	cfg := obelisk.Config{EnableLog: true}
-	result, _, err := obelisk.Archive(context.Background(), req, cfg)
+	arc := obelisk.Archiver{EnableLog: true}
+	arc.Validate()
+
+	result, _, err := arc.Archive(context.Background(), req)
 	checkError(err)
 
 	// Create destination file
