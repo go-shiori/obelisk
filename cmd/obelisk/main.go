@@ -17,6 +17,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type archiveRequest struct {
+	URL      string
+	FileName string
+}
+
 func main() {
 	// Prepare cmd
 	cmd := &cobra.Command{
@@ -87,34 +92,32 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		os.MkdirAll(outputDir, os.ModePerm)
 	}
 
-	// Create initial list of URLs
+	// Create initial list of archival request
 	var err error
-	urls := make(map[string]string)
+	requests := []archiveRequest{}
 	for _, arg := range args {
-		urls[arg] = ""
+		requests = append(requests, archiveRequest{URL: arg})
 	}
 
 	// Parse input file
 	if inputPath != "" {
-		newURLs, err := parseInputFile(inputPath)
+		requestsFromFile, err := parseInputFile(inputPath)
 		if err != nil {
 			return err
 		}
 
-		for url, dstPath := range newURLs {
-			urls[url] = dstPath
+		for _, req := range requestsFromFile {
+			requests = append(requests, req)
 		}
 	}
 
-	// Depending of urls count, there are some thing to do
-	switch len(urls) {
+	// Depending of requests count, there are some thing to do
+	switch len(requests) {
 	case 0:
 		return fmt.Errorf("no url to process")
 	case 1:
-		for url, fileName := range urls {
-			if fileName == "" && outputFileName != "" {
-				urls[url] = outputFileName
-			}
+		if requests[0].FileName == "" && outputFileName != "" {
+			requests[0].FileName = outputFileName
 		}
 	default:
 		useStdout = false
@@ -151,17 +154,17 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	// Process each url
 	finishedURLs := make(map[string]struct{})
 
-	for strURL, fileName := range urls {
+	for _, request := range requests {
 		err = func() error {
 			// Make sure this URL hasn't been processed
-			if _, finished := finishedURLs[strURL]; finished {
+			if _, finished := finishedURLs[request.URL]; finished {
 				return nil
 			}
 
 			// Validate URL
-			url, err := nurl.ParseRequestURI(strURL)
+			url, err := nurl.ParseRequestURI(request.URL)
 			if err != nil || url.Scheme == "" || url.Hostname() == "" {
-				logrus.Warnf("%s is not valid URL\n", strURL)
+				logrus.Warnf("%s is not valid URL\n", request.URL)
 				return nil
 			}
 
@@ -182,8 +185,8 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 			}
 
 			// Start archival
-			if !disableLog || len(urls) > 1 {
-				logrus.Printf("archival started for %s\n", strURL)
+			if !disableLog || len(requests) > 1 {
+				logrus.Printf("archival started for %s\n", request.URL)
 			}
 
 			result, contentType, err := archiver.Archive(context.Background(), req)
@@ -196,6 +199,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 			if useStdout {
 				output = os.Stdout
 			} else {
+				fileName := request.FileName
 				if fileName == "" {
 					fileName = createFileName(url, contentType)
 					if useGzip {
@@ -224,11 +228,11 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 				return err
 			}
 
-			if !disableLog || len(urls) > 1 {
-				logrus.Printf("archival finished for %s\n", strURL)
+			if !disableLog || len(requests) > 1 {
+				logrus.Printf("archival finished for %s\n", request.URL)
 			}
 
-			finishedURLs[strURL] = struct{}{}
+			finishedURLs[request.URL] = struct{}{}
 			return nil
 		}()
 
