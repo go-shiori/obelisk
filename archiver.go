@@ -52,6 +52,7 @@ type Archiver struct {
 	RequestTimeout        time.Duration
 	SkipTLSVerification   bool
 	MaxConcurrentDownload int64
+	SkipResourceURLError  bool
 
 	isValidated bool
 	cookies     []*http.Cookie
