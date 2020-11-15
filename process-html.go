@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	rxLazyImageSrc    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp)\S*\s*$`)
-	rxLazyImageSrcset = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)\s+\d`)
-	rxImgExtensions   = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp)`)
+	rxLazyImageSrc    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp|gif)\S*\s*$`)
+	rxLazyImageSrcset = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp|gif)\s+\d`)
+	rxImgExtensions   = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp|gif)`)
 	rxSrcsetURL       = regexp.MustCompile(`(?i)(\S+)(\s+[\d.]+[xw])?(\s*(?:,|$))`)
 	rxB64DataURL      = regexp.MustCompile(`(?i)^data:\s*([^\s;,]+)\s*;\s*base64\s*`)
 )
