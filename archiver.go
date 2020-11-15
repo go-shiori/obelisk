@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	nurl "net/url"
 	"strings"
@@ -52,6 +53,7 @@ type Archiver struct {
 	RequestTimeout        time.Duration
 	SkipTLSVerification   bool
 	MaxConcurrentDownload int64
+	DialContext           func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	isValidated bool
 	cookies     []*http.Cookie
@@ -80,6 +82,7 @@ func (arc *Archiver) Validate() {
 	arc.httpClient = &http.Client{
 		Timeout: arc.RequestTimeout,
 		Transport: &http.Transport{
+			DialContext: arc.DialContext,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: arc.SkipTLSVerification,
 			},
