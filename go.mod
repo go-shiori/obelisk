@@ -1,4 +1,4 @@
-module github.com/go-shiori/obelisk
+module github.com/tmahlburg/obelisk
 
 go 1.14
 
