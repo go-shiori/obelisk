@@ -47,6 +47,7 @@ func main() {
 	cmd.Flags().IntP("timeout", "t", 60, "maximum time (in second) before request timeout")
 	cmd.Flags().Bool("insecure", false, "skip X.509 (TLS) certificate verification")
 	cmd.Flags().Int64("max-concurrent-download", 10, "max concurrent download at a time")
+	cmd.Flags().Bool("skip-resource-url-error", false, "skip process resource url error")
 
 	// Execute
 	err := cmd.Execute()
@@ -74,6 +75,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	skipTLSVerification, _ := cmd.Flags().GetBool("insecure")
 	maxConcurrentDownload, _ := cmd.Flags().GetInt64("max-concurrent-download")
+	skipResourceURLError, _ := cmd.Flags().GetBool("skip-resource-url-error")
 
 	// Prepare output target
 	outputDir := ""
@@ -148,6 +150,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		RequestTimeout:        time.Duration(timeout) * time.Second,
 		SkipTLSVerification:   skipTLSVerification,
 		MaxConcurrentDownload: maxConcurrentDownload,
+		SkipResourceURLError:  skipResourceURLError,
 	}
 	archiver.Validate()
 
