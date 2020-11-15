@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/tdewolff/parse/v2"
 	"github.com/tdewolff/parse/v2/css"
 	"golang.org/x/sync/errgroup"
 )
@@ -18,7 +19,7 @@ func (arc *Archiver) processCSS(ctx context.Context, input io.Reader, baseURL *n
 
 	// Scan CSS and find all URLs
 	urls := make(map[string]struct{})
-	lexer := css.NewLexer(input)
+	lexer := css.NewLexer(parse.NewInput(input))
 
 	for {
 		token, bt := lexer.Next()
