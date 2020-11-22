@@ -30,6 +30,7 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 
 	// Prepare documents by doing these steps :
 	// - Set Content-Security-Policy to make sure no unwanted request happened
+	// - Set source URL into head
 	// - Apply configuration to documents
 	// - Replace all noscript to divs, to make it processed as well
 	// - Remove all comments in documents
@@ -37,6 +38,7 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	// - Convert relative URL into absolute URL
 	// - Remove subresources integrity attribute from links
 	arc.setContentSecurityPolicy(doc)
+	arc.setSourceURL(doc, baseURL)
 	arc.applyConfiguration(doc)
 	arc.convertNoScriptToDiv(doc, true)
 	arc.removeComments(doc)
@@ -162,6 +164,16 @@ func (arc *Archiver) setContentSecurityPolicy(doc *html.Node) {
 		dom.SetAttribute(meta, "content", policies[i])
 		dom.PrependChild(heads[0], meta)
 	}
+}
+
+// set original URL into head meta
+func (arc *Archiver) setSourceURL(doc *html.Node, baseURL *nurl.URL) {
+	// Put the URL to head
+	heads := dom.GetElementsByTagName(doc, "head")
+	meta := dom.CreateElement("meta")
+	dom.SetAttribute(meta, "property", "source:url")
+	dom.SetAttribute(meta, "content", baseURL.String())
+	dom.PrependChild(heads[0], meta)
 }
 
 // applyConfiguration removes or replace elements following the configuration.
