@@ -59,6 +59,7 @@ Flags:
   -z, --gzip                          gzip archival result
   -h, --help                          help for obelisk
   -i, --input string                  path to file which contains URLs
+      --insecure                      skip X.509 (TLS) certificate verification
   -c, --load-cookies string           path to Netscape cookie file
       --max-concurrent-download int   max concurrent download at a time (default 10)
       --no-css                        disable CSS styling
@@ -67,6 +68,8 @@ Flags:
       --no-medias                     remove media elements (e.g img, audio)
   -o, --output string                 path to save archival result
   -q, --quiet                         disable logging
+      --skip-resource-url-error       skip process resource url error
+  -t, --timeout int                   maximum time (in second) before request timeout (default 60)
   -u, --user-agent string             set custom user agent
       --verbose                       more verbose logging
 ```
