@@ -45,6 +45,7 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	arc.convertLazyImageAttrs(doc)
 	arc.convertRelativeURLs(doc, baseURL)
 	arc.removeLinkIntegrityAttr(doc)
+	arc.appendTitle(doc)
 
 	// Find all nodes which might has subresource.
 	// A node might has subresource if it fulfills one of these criteria :
@@ -390,6 +391,32 @@ func (arc *Archiver) removeLinkIntegrityAttr(doc *html.Node) {
 	for _, link := range dom.GetElementsByTagName(doc, "link") {
 		dom.RemoveAttribute(link, "integrity")
 	}
+}
+
+// appendTitle extract og:title and append to title tag if it don't exists.
+func (arc *Archiver) appendTitle(doc *html.Node) {
+	title := dom.QuerySelector(doc, "title")
+	if title != nil {
+		if dom.InnerText(title) != "" {
+			return
+		}
+	}
+	ogTitle := dom.QuerySelector(doc, "meta[property='og:title']")
+	if ogTitle == nil {
+		return
+	}
+
+	// Find the head, create it if necessary
+	heads := dom.GetElementsByTagName(doc, "head")
+	if len(heads) == 0 {
+		newHead := dom.CreateElement("head")
+		dom.PrependChild(doc, newHead)
+		heads = []*html.Node{newHead}
+	}
+
+	title = dom.CreateElement("title")
+	dom.SetTextContent(title, dom.GetAttribute(ogTitle, "content"))
+	dom.PrependChild(heads[0], title)
 }
 
 // removeComments find all comments in document then remove it.
