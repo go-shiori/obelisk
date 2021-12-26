@@ -509,7 +509,7 @@ func (arc *Archiver) processLinkNode(ctx context.Context, node *html.Node, baseU
 	// Convert <link> into <style>
 	node.Data = "style"
 	dom.SetAttribute(node, "type", "text/css")
-	dom.SetTextContent(node, string(content))
+	dom.SetTextContent(node, b2s(content))
 	return nil
 }
 
@@ -528,7 +528,7 @@ func (arc *Archiver) processScriptNode(ctx context.Context, node *html.Node, bas
 	}
 
 	dom.RemoveAttribute(node, "src")
-	dom.SetTextContent(node, string(content))
+	dom.SetTextContent(node, b2s(content))
 	return nil
 }
 

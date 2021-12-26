@@ -72,7 +72,7 @@ func (arc *Archiver) processURL(ctx context.Context, url string, parentURL strin
 	case contentType == "text/html" && isEmbedded:
 		newHTML, err := arc.processHTML(ctx, resp.Body, parsedURL)
 		if err == nil {
-			bodyContent = []byte(newHTML)
+			bodyContent = s2b(newHTML)
 		} else {
 			return nil, "", err
 		}
@@ -80,7 +80,7 @@ func (arc *Archiver) processURL(ctx context.Context, url string, parentURL strin
 	case contentType == "text/css":
 		newCSS, err := arc.processCSS(ctx, resp.Body, parsedURL)
 		if err == nil {
-			bodyContent = []byte(newCSS)
+			bodyContent = s2b(newCSS)
 		} else {
 			return nil, "", err
 		}

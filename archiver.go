@@ -135,7 +135,7 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 		return nil, "", err
 	}
 
-	return []byte(result), contentType, nil
+	return s2b(result), contentType, nil
 }
 
 func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response, error) {
