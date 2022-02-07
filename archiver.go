@@ -64,6 +64,8 @@ type Archiver struct {
 	cookies     []*http.Cookie
 	httpClient  *http.Client
 	dlSemaphore *semaphore.Weighted
+
+	SingleFile bool
 }
 
 // Validate prepares Archiver to make sure its configurations
@@ -179,6 +181,10 @@ func (arc *Archiver) transform(uri string, content []byte) string {
 	if err != nil {
 		name = sanitize.BaseName(uri)
 		path = filepath.Join(arc.ResTempDir, name)
+	}
+
+	if arc.SingleFile {
+		return createDataURL(content, http.DetectContentType(content))
 	}
 
 	if err := ioutil.WriteFile(path, content, 0600); err != nil {
