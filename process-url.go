@@ -12,6 +12,7 @@ import (
 
 var errSkippedURL = errors.New("skip processing url")
 
+//nolint:gocyclo,unparam
 func (arc *Archiver) processURL(ctx context.Context, url string, parentURL string, embedded ...bool) ([]byte, string, error) {
 	// Parse embedded value
 	isEmbedded := len(embedded) != 0 && embedded[0]
