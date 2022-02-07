@@ -107,7 +107,7 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 		return nil, "", fmt.Errorf("request url is not specified")
 	}
 
-	url, err := nurl.ParseRequestURI(req.URL)
+	url, err := nurl.Parse(req.URL)
 	if err != nil || url.Scheme == "" || url.Hostname() == "" {
 		return nil, "", fmt.Errorf("url \"%s\" is not valid", req.URL)
 	}
