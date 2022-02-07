@@ -173,7 +173,7 @@ func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response,
 	return resp, err
 }
 
-func (arc *Archiver) transform(uri string, content []byte) string {
+func (arc *Archiver) transform(uri string, content []byte, contentType string) string {
 	path, name, err := arc.store(uri)
 	if err != nil {
 		name = sanitize.BaseName(uri)
@@ -181,12 +181,18 @@ func (arc *Archiver) transform(uri string, content []byte) string {
 	}
 
 	if arc.SingleFile {
-		return createDataURL(content, http.DetectContentType(content))
+		if contentType == "" {
+			contentType = http.DetectContentType(content)
+		}
+		return createDataURL(content, contentType)
 	}
 
 	if err := ioutil.WriteFile(path, content, 0600); err != nil {
 		// Fallback to creating data URL
-		return createDataURL(content, http.DetectContentType(content))
+		if contentType == "" {
+			contentType = http.DetectContentType(content)
+		}
+		return createDataURL(content, contentType)
 	}
 
 	return filepath.Join(".", name)
