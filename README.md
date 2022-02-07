@@ -29,6 +29,11 @@ Run following command inside your Go project :
 go get -u -v github.com/go-shiori/obelisk
 ```
 
+If you prefer to use changes from this repository, run :
+```
+go mod edit -replace github.com/go-shiori/obelisk=github.com/wabarc/obelisk@main
+```
+
 Next, include Obelisk in your application :
 
 ```go
