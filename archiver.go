@@ -2,11 +2,9 @@ package obelisk
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	nurl "net/url"
 	"os"
@@ -53,10 +51,9 @@ type Archiver struct {
 	DisableEmbeds bool
 	DisableMedias bool
 
+	Transport             http.RoundTripper
 	RequestTimeout        time.Duration
-	SkipTLSVerification   bool
 	MaxConcurrentDownload int64
-	DialContext           func(ctx context.Context, network, addr string) (net.Conn, error)
 	SkipResourceURLError  bool
 	ResTempDir            string // directory to stores resources
 
@@ -86,14 +83,14 @@ func (arc *Archiver) Validate() {
 
 	arc.isValidated = true
 	arc.dlSemaphore = semaphore.NewWeighted(arc.MaxConcurrentDownload)
+
+	if arc.Transport == nil {
+		arc.Transport = http.DefaultTransport
+	}
+
 	arc.httpClient = &http.Client{
-		Timeout: arc.RequestTimeout,
-		Transport: &http.Transport{
-			DialContext: arc.DialContext,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: arc.SkipTLSVerification, //nolint:gosec
-			},
-		},
+		Timeout:   arc.RequestTimeout,
+		Transport: arc.Transport,
 	}
 }
 
