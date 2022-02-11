@@ -517,7 +517,7 @@ func (arc *Archiver) processLinkNode(ctx context.Context, node *html.Node, baseU
 		return err
 	}
 
-	if arc.ResTempDir != "" {
+	if arc.WrapDirectory != "" {
 		newSrc := arc.transform(url, content, contentType)
 		dom.SetAttribute(node, "href", newSrc)
 	} else {
@@ -548,7 +548,7 @@ func (arc *Archiver) processScriptNode(ctx context.Context, node *html.Node, bas
 		return err
 	}
 
-	if arc.ResTempDir != "" {
+	if arc.WrapDirectory != "" {
 		newSrc := arc.transform(url, content, contentType)
 		dom.SetAttribute(node, "src", newSrc)
 	} else {

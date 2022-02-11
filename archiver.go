@@ -55,14 +55,12 @@ type Archiver struct {
 	RequestTimeout        time.Duration
 	MaxConcurrentDownload int64
 	SkipResourceURLError  bool
-	ResTempDir            string // directory to stores resources
+	WrapDirectory         string // directory to stores resources
 
 	isValidated bool
 	cookies     []*http.Cookie
 	httpClient  *http.Client
 	dlSemaphore *semaphore.Weighted
-
-	SingleFile bool
 }
 
 // Validate prepares Archiver to make sure its configurations
@@ -174,17 +172,18 @@ func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response,
 }
 
 func (arc *Archiver) transform(uri string, content []byte, contentType string) string {
-	path, name, err := arc.store(uri)
-	if err != nil {
-		name = sanitize.BaseName(uri)
-		path = filepath.Join(arc.ResTempDir, name)
-	}
-
-	if arc.SingleFile {
+	// If no directory to store files is specified, save as a single file.
+	if arc.WrapDirectory == "" {
 		if contentType == "" {
 			contentType = http.DetectContentType(content)
 		}
 		return createDataURL(content, contentType)
+	}
+
+	path, name, err := arc.store(uri)
+	if err != nil {
+		name = sanitize.BaseName(uri)
+		path = filepath.Join(arc.WrapDirectory, name)
 	}
 
 	if err := ioutil.WriteFile(path, content, 0600); err != nil {
@@ -212,7 +211,7 @@ func (arc *Archiver) store(uri string) (path string, rel string, err error) {
 		return "", "", err
 	}
 	// e.g. /tmp/some/statics/css/
-	dir := filepath.Join(arc.ResTempDir, filepath.Dir(rel))
+	dir := filepath.Join(arc.WrapDirectory, filepath.Dir(rel))
 	if err != nil {
 		return "", "", err
 	}
