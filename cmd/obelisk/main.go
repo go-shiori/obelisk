@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -134,6 +135,11 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: skipTLSVerification, //nolint:gosec
+		},
+	}
 	// Create archiver
 	archiver := obelisk.Archiver{
 		Cache: make(map[string]obelisk.Asset),
@@ -147,8 +153,8 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		DisableEmbeds: disableEmbeds,
 		DisableMedias: disableMedias,
 
+		Transport:             transport,
 		RequestTimeout:        time.Duration(timeout) * time.Second,
-		SkipTLSVerification:   skipTLSVerification,
 		MaxConcurrentDownload: maxConcurrentDownload,
 		SkipResourceURLError:  skipResourceURLError,
 	}
