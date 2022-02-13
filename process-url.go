@@ -71,7 +71,7 @@ func (arc *Archiver) processURL(ctx context.Context, url string, parentURL strin
 
 	switch {
 	case contentType == "text/html" && isEmbedded:
-		newHTML, err := arc.processHTML(ctx, resp.Body, parsedURL)
+		newHTML, err := arc.processHTML(ctx, resp.Body, parsedURL, false)
 		if err == nil {
 			bodyContent = s2b(newHTML)
 		} else {

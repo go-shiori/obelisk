@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-shiori/dom"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -22,33 +23,50 @@ var (
 )
 
 //nolint:gocyclo,goconst
-func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
+func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL, isFragment bool) (string, error) {
 	// Parse input into HTML document
-	doc, err := html.Parse(input)
+	var doc *html.Node
+	var err error
+	if !isFragment {
+		doc, err = html.Parse(input)
+	} else {
+		doc = &html.Node{
+			Type:     html.ElementNode,
+			Data:     "body",
+			DataAtom: atom.Body,
+		}
+		var fragments []*html.Node
+		fragments, err = html.ParseFragment(input, doc)
+		for _, node := range fragments {
+			doc.AppendChild(node)
+		}
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to parse HTML: %w", err)
 	}
 
-	// Prepare documents by doing these steps :
-	// - Set Content-Security-Policy to make sure no unwanted Request happened
-	// - append source URL into head
-	// - Add charset meta into head
-	// - Apply configuration to documents
-	// - Replace all noscript to divs, to make it processed as well
-	// - Remove all comments in documents
-	// - Convert data-src and data-srcset attribute in lazy image to src and srcset
-	// - Convert relative URL into absolute URL
-	// - Remove subresources integrity attribute from links
-	arc.setContentSecurityPolicy(doc)
-	arc.setSourceURL(doc, baseURL)
-	arc.addMeta(doc)
-	arc.applyConfiguration(doc)
-	arc.convertNoScriptToDiv(doc, true)
-	arc.removeComments(doc)
-	arc.convertLazyImageAttrs(doc)
-	arc.convertRelativeURLs(doc, baseURL)
-	arc.removeLinkIntegrityAttr(doc)
-	arc.appendTitle(doc)
+	if !isFragment {
+		// Prepare documents by doing these steps :
+		// - Set Content-Security-Policy to make sure no unwanted Request happened
+		// - append source URL into head
+		// - Add charset meta into head
+		// - Apply configuration to documents
+		// - Replace all noscript to divs, to make it processed as well
+		// - Remove all comments in documents
+		// - Convert data-src and data-srcset attribute in lazy image to src and srcset
+		// - Convert relative URL into absolute URL
+		// - Remove subresources integrity attribute from links
+		arc.setContentSecurityPolicy(doc)
+		arc.setSourceURL(doc, baseURL)
+		arc.addMeta(doc)
+		arc.applyConfiguration(doc)
+		arc.convertNoScriptToDiv(doc, true)
+		arc.removeComments(doc)
+		arc.convertLazyImageAttrs(doc)
+		arc.convertRelativeURLs(doc, baseURL)
+		arc.removeLinkIntegrityAttr(doc)
+		arc.appendTitle(doc)
+	}
 
 	// Find all nodes which might has subresource.
 	// A node might has subresource if it fulfills one of these criteria :
@@ -100,6 +118,8 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 				return arc.processEmbedNode(ctx, node, baseURL)
 			case "img", "picture", "figure", "video", "audio", "source":
 				return arc.processMediaNode(ctx, node, baseURL)
+			case "template":
+				return arc.processTemplateNode(ctx, node, baseURL)
 			default:
 				return nil
 			}
@@ -115,8 +135,11 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	arc.revertConvertedNoScript(doc)
 
 	// Convert document back to string
-	docHTML := dom.OuterHTML(doc)
-	return docHTML, nil
+	if isFragment {
+		return dom.InnerHTML(doc), nil
+	} else {
+		return dom.OuterHTML(doc), nil
+	}
 }
 
 // setContentSecurityPolicy prevent browsers from Requesting any remote
@@ -534,7 +557,21 @@ func (arc *Archiver) processLinkNode(ctx context.Context, node *html.Node, baseU
 	return nil
 }
 
+func (arc *Archiver) processTemplateNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+	result, err := arc.processHTML(ctx, strings.NewReader(dom.TextContent(node)), baseURL, true)
+	if err != nil {
+		return err
+	}
+	dom.SetTextContent(node, result)
+	return nil
+}
+
 func (arc *Archiver) processScriptNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+	if dom.GetAttribute(node, "type") == "text/template" {
+		if err := arc.processTemplateNode(ctx, node, baseURL); err != nil {
+			return err
+		}
+	}
 	if !dom.HasAttribute(node, "src") {
 		return nil
 	}

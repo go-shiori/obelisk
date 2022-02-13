@@ -131,7 +131,7 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	}
 
 	// If it's HTML process it
-	result, err := arc.processHTML(ctx, req.Input, url)
+	result, err := arc.processHTML(ctx, req.Input, url, false)
 	if err != nil {
 		return nil, "", err
 	}
