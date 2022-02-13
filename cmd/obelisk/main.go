@@ -57,6 +57,7 @@ func main() {
 	}
 }
 
+// nolint:gocyclo
 func cmdHandler(cmd *cobra.Command, args []string) error {
 	// Parse flags
 	inputPath, _ := cmd.Flags().GetString("input")
@@ -92,7 +93,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		}
 
 		// Make sure output dir exists
-		os.MkdirAll(outputDir, os.ModePerm)
+		_ = os.MkdirAll(outputDir, os.ModePerm)
 	}
 
 	// Create initial list of archival request
@@ -108,10 +109,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-
-		for _, req := range requestsFromFile {
-			requests = append(requests, req)
-		}
+		requests = append(requests, requestsFromFile...)
 	}
 
 	// Depending of requests count, there are some thing to do

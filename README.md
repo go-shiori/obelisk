@@ -25,12 +25,12 @@ Obelisk is a Go package and CLI tool for saving web page as single HTML file, wi
 
 Run following command inside your Go project :
 
-```
+```shell
 go get -u -v github.com/go-shiori/obelisk
 ```
 
 If you prefer to use changes from this repository, run :
-```
+```shell
 go mod edit -replace github.com/go-shiori/obelisk=github.com/wabarc/obelisk@main
 ```
 
@@ -46,13 +46,13 @@ Now you can use Obelisk archival feature for your application. For basic usage y
 
 You can download the latest version of Obelisk from [release page](https://github.com/go-shiori/obelisk/releases). To build from source, make sure you use `go >= 1.13` then run following commands :
 
-```
+```shell
 go get -u -v github.com/go-shiori/obelisk/cmd/obelisk
 ```
 
 Now you can use it from your terminal :
 
-```
+```shell
 $ obelisk -h
 
 CLI tool for saving web page as single HTML file
@@ -83,7 +83,7 @@ There are some CLI behavior that I think need to be explained more here :
 
 - The `--input` flag accepts text file that contains list of urls that look like this :
 
-    ```
+    ```plain
 	http://www.domain1.com/some/path
 	http://www.domain2.com/some/path
 	http://www.domain3.com/some/path
@@ -91,7 +91,7 @@ There are some CLI behavior that I think need to be explained more here :
 
 - The `--load-cookies` flag accepts Netscape cookie file that usually look like this :
 
-    ```
+    ```plain
 	# Netscape HTTP Cookie File
 	# https://curl.haxx.se/rfc/cookie_spec.html
 	# This is a generated file! Do not edit.
