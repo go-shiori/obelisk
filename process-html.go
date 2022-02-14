@@ -205,13 +205,17 @@ func (arc *Archiver) setSourceURL(doc *html.Node, baseURL *nurl.URL) {
 
 // add head meta
 func (arc *Archiver) addMeta(doc *html.Node) {
+	for _, meta := range dom.GetElementsByTagName(doc, "meta") {
+		charset := dom.GetAttribute(meta, "charset")
+		if charset != "" {
+			return
+		}
+	}
+
 	heads := dom.GetElementsByTagName(doc, "head")
 	meta := dom.CreateElement("meta")
-	charset := dom.GetAttribute(meta, "charset")
-	if charset == "" {
-		dom.SetAttribute(meta, "charset", "utf-8")
-		dom.PrependChild(heads[0], meta)
-	}
+	dom.SetAttribute(meta, "charset", "utf-8")
+	dom.PrependChild(heads[0], meta)
 }
 
 // applyConfiguration removes or replace elements following the configuration.
