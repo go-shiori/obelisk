@@ -27,6 +27,8 @@ type Request struct {
 	Input   io.Reader
 	URL     string
 	Cookies []*http.Cookie
+
+	origin *nurl.URL // The original URL request was based from the input. If there are no redirects, it should be the same as `URL`.
 }
 
 // Asset is asset that used in a web page.
@@ -109,6 +111,10 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	if err != nil || url.Scheme == "" || url.Hostname() == "" {
 		return nil, "", fmt.Errorf("url \"%s\" is not valid", req.URL)
 	}
+	// Set the original url
+	req.origin = url
+	ctx = withOrigin(ctx, req.origin)
+	url = arc.finalURI(url)
 
 	// If needed download page from source URL
 	contentType := "text/html"
@@ -139,8 +145,25 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	return s2b(result), contentType, nil
 }
 
+// finalURI returns the final URL that has been redirected to another URL.
+func (arc *Archiver) finalURI(u *nurl.URL) *nurl.URL {
+	req, err := http.NewRequest(http.MethodHead, u.String(), nil)
+	if err != nil {
+		return u
+	}
+	req.Header.Set("User-Agent", arc.UserAgent)
+
+	resp, err := arc.httpClient.Do(req)
+	if err != nil {
+		return u
+	}
+	defer resp.Body.Close()
+
+	return resp.Request.URL
+}
+
 func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
