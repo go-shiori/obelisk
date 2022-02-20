@@ -2,23 +2,24 @@ package obelisk
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	nurl "net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
+	"github.com/kennygrant/sanitize"
 	"golang.org/x/sync/semaphore"
 )
 
 var (
-	// DefaultUserAgent is the default user agent to use, which is Chrome's.
-	DefaultUserAgent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0"
+	defaultUserAgent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0"
 )
 
 // Request is data of archival request.
@@ -50,11 +51,11 @@ type Archiver struct {
 	DisableEmbeds bool
 	DisableMedias bool
 
+	Transport             http.RoundTripper
 	RequestTimeout        time.Duration
-	SkipTLSVerification   bool
 	MaxConcurrentDownload int64
-	DialContext           func(ctx context.Context, network, addr string) (net.Conn, error)
 	SkipResourceURLError  bool
+	WrapDirectory         string // directory to stores resources
 
 	isValidated bool
 	cookies     []*http.Cookie
@@ -71,7 +72,7 @@ func (arc *Archiver) Validate() {
 	}
 
 	if arc.UserAgent == "" {
-		arc.UserAgent = DefaultUserAgent
+		arc.UserAgent = defaultUserAgent
 	}
 
 	if arc.MaxConcurrentDownload <= 0 {
@@ -80,14 +81,14 @@ func (arc *Archiver) Validate() {
 
 	arc.isValidated = true
 	arc.dlSemaphore = semaphore.NewWeighted(arc.MaxConcurrentDownload)
+
+	if arc.Transport == nil {
+		arc.Transport = http.DefaultTransport
+	}
+
 	arc.httpClient = &http.Client{
-		Timeout: arc.RequestTimeout,
-		Transport: &http.Transport{
-			DialContext: arc.DialContext,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: arc.SkipTLSVerification,
-			},
-		},
+		Timeout:   arc.RequestTimeout,
+		Transport: arc.Transport,
 	}
 }
 
@@ -104,7 +105,7 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 		return nil, "", fmt.Errorf("request url is not specified")
 	}
 
-	url, err := nurl.ParseRequestURI(req.URL)
+	url, err := nurl.Parse(req.URL)
 	if err != nil || url.Scheme == "" || url.Hostname() == "" {
 		return nil, "", fmt.Errorf("url \"%s\" is not valid", req.URL)
 	}
@@ -130,12 +131,12 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	}
 
 	// If it's HTML process it
-	result, err := arc.processHTML(ctx, req.Input, url)
+	result, err := arc.processHTML(ctx, req.Input, url, false)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return []byte(result), contentType, nil
+	return s2b(result), contentType, nil
 }
 
 func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response, error) {
@@ -153,10 +154,71 @@ func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response,
 		req.AddCookie(cookie)
 	}
 
-	resp, err := arc.httpClient.Do(req)
-	if err != nil {
-		return nil, err
+	var resp *http.Response
+	op := func() error {
+		var err error
+		resp, err = arc.httpClient.Do(req) //nolint:bodyclose,goimports
+		if err == nil && resp != nil && resp.StatusCode > 200 {
+			err = fmt.Errorf("failed to fetch with status code: %d", resp.StatusCode)
+		}
+		return err
+	}
+	exp := backoff.NewExponentialBackOff()
+	exp.MaxElapsedTime = 5 * time.Minute
+	bo := backoff.WithMaxRetries(exp, 10)
+	err = backoff.Retry(op, bo)
+
+	return resp, err
+}
+
+func (arc *Archiver) transform(uri string, content []byte, contentType string) string {
+	// If no directory to store files is specified, save as a single file.
+	if arc.WrapDirectory == "" {
+		if contentType == "" {
+			contentType = http.DetectContentType(content)
+		}
+		return createDataURL(content, contentType)
 	}
 
-	return resp, nil
+	path, name, err := arc.store(uri)
+	if err != nil {
+		name = sanitize.BaseName(uri)
+		path = filepath.Join(arc.WrapDirectory, name)
+	}
+
+	if err := ioutil.WriteFile(path, content, 0600); err != nil {
+		// Fallback to creating data URL
+		if contentType == "" {
+			contentType = http.DetectContentType(content)
+		}
+		return createDataURL(content, contentType)
+	}
+
+	return filepath.Join(".", name)
+}
+
+func (arc *Archiver) store(uri string) (path string, rel string, err error) {
+	if uri == "" {
+		return "", "", nil
+	}
+	u, err := nurl.ParseRequestURI(uri)
+	if err != nil {
+		return "", "", err
+	}
+	// e.g. /statics/css/foo.css
+	rel, err = filepath.Abs(u.Path)
+	if err != nil {
+		return "", "", err
+	}
+	// e.g. /tmp/some/statics/css/
+	dir := filepath.Join(arc.WrapDirectory, filepath.Dir(rel))
+	if err != nil {
+		return "", "", err
+	}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", "", err
+	}
+	// e.g. /tmp/some/statics/css/foo.css
+	path = filepath.Join(dir, filepath.Base(rel))
+	return path, rel, nil
 }

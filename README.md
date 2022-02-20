@@ -25,7 +25,7 @@ Obelisk is a Go package and CLI tool for saving web page as single HTML file, wi
 
 Run following command inside your Go project :
 
-```
+```shell
 go get -u -v github.com/go-shiori/obelisk
 ```
 
@@ -41,13 +41,13 @@ Now you can use Obelisk archival feature for your application. For basic usage y
 
 You can download the latest version of Obelisk from [release page](https://github.com/go-shiori/obelisk/releases). To build from source, make sure you use `go >= 1.13` then run following commands :
 
-```
+```shell
 go get -u -v github.com/go-shiori/obelisk/cmd/obelisk
 ```
 
 Now you can use it from your terminal :
 
-```
+```shell
 $ obelisk -h
 
 CLI tool for saving web page as single HTML file
@@ -59,6 +59,7 @@ Flags:
   -z, --gzip                          gzip archival result
   -h, --help                          help for obelisk
   -i, --input string                  path to file which contains URLs
+      --insecure                      skip X.509 (TLS) certificate verification
   -c, --load-cookies string           path to Netscape cookie file
       --max-concurrent-download int   max concurrent download at a time (default 10)
       --no-css                        disable CSS styling
@@ -67,6 +68,8 @@ Flags:
       --no-medias                     remove media elements (e.g img, audio)
   -o, --output string                 path to save archival result
   -q, --quiet                         disable logging
+      --skip-resource-url-error       skip process resource url error
+  -t, --timeout int                   maximum time (in second) before request timeout (default 60)
   -u, --user-agent string             set custom user agent
       --verbose                       more verbose logging
 ```
@@ -75,7 +78,7 @@ There are some CLI behavior that I think need to be explained more here :
 
 - The `--input` flag accepts text file that contains list of urls that look like this :
 
-    ```
+    ```plain
 	http://www.domain1.com/some/path
 	http://www.domain2.com/some/path
 	http://www.domain3.com/some/path
@@ -83,7 +86,7 @@ There are some CLI behavior that I think need to be explained more here :
 
 - The `--load-cookies` flag accepts Netscape cookie file that usually look like this :
 
-    ```
+    ```plain
 	# Netscape HTTP Cookie File
 	# https://curl.haxx.se/rfc/cookie_spec.html
 	# This is a generated file! Do not edit.

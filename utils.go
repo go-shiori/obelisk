@@ -4,8 +4,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	nurl "net/url"
+	"reflect"
 	"regexp"
 	"strings"
+	"unsafe"
 )
 
 var (
@@ -87,4 +89,19 @@ func sanitizeStyleURL(url string) string {
 func createDataURL(content []byte, contentType string) string {
 	b64encoded := base64.StdEncoding.EncodeToString(content)
 	return fmt.Sprintf("data:%s;base64,%s", contentType, b64encoded)
+}
+
+// s2b converts string to a byte slice without memory allocation.
+func s2b(s string) (b []byte) {
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	bh.Data = sh.Data
+	bh.Cap = sh.Len
+	bh.Len = sh.Len
+	return b
+}
+
+// b2s converts byte slice to a string without memory allocation.
+func b2s(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }

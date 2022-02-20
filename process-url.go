@@ -12,6 +12,7 @@ import (
 
 var errSkippedURL = errors.New("skip processing url")
 
+//nolint:gocyclo,unparam
 func (arc *Archiver) processURL(ctx context.Context, url string, parentURL string, embedded ...bool) ([]byte, string, error) {
 	// Parse embedded value
 	isEmbedded := len(embedded) != 0 && embedded[0]
@@ -70,9 +71,9 @@ func (arc *Archiver) processURL(ctx context.Context, url string, parentURL strin
 
 	switch {
 	case contentType == "text/html" && isEmbedded:
-		newHTML, err := arc.processHTML(ctx, resp.Body, parsedURL)
+		newHTML, err := arc.processHTML(ctx, resp.Body, parsedURL, false)
 		if err == nil {
-			bodyContent = []byte(newHTML)
+			bodyContent = s2b(newHTML)
 		} else {
 			return nil, "", err
 		}
@@ -80,7 +81,7 @@ func (arc *Archiver) processURL(ctx context.Context, url string, parentURL strin
 	case contentType == "text/css":
 		newCSS, err := arc.processCSS(ctx, resp.Body, parsedURL)
 		if err == nil {
-			bodyContent = []byte(newCSS)
+			bodyContent = s2b(newCSS)
 		} else {
 			return nil, "", err
 		}

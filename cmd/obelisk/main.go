@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -56,6 +57,7 @@ func main() {
 	}
 }
 
+// nolint:gocyclo
 func cmdHandler(cmd *cobra.Command, args []string) error {
 	// Parse flags
 	inputPath, _ := cmd.Flags().GetString("input")
@@ -91,7 +93,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		}
 
 		// Make sure output dir exists
-		os.MkdirAll(outputDir, os.ModePerm)
+		_ = os.MkdirAll(outputDir, os.ModePerm)
 	}
 
 	// Create initial list of archival request
@@ -107,10 +109,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-
-		for _, req := range requestsFromFile {
-			requests = append(requests, req)
-		}
+		requests = append(requests, requestsFromFile...)
 	}
 
 	// Depending of requests count, there are some thing to do
@@ -134,6 +133,13 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if skipTLSVerification {
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: skipTLSVerification, //nolint:gosec
+		}
+	}
+
 	// Create archiver
 	archiver := obelisk.Archiver{
 		Cache: make(map[string]obelisk.Asset),
@@ -147,8 +153,8 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		DisableEmbeds: disableEmbeds,
 		DisableMedias: disableMedias,
 
+		Transport:             transport,
 		RequestTimeout:        time.Duration(timeout) * time.Second,
-		SkipTLSVerification:   skipTLSVerification,
 		MaxConcurrentDownload: maxConcurrentDownload,
 		SkipResourceURLError:  skipResourceURLError,
 	}

@@ -56,7 +56,7 @@ func (arc *Archiver) processCSS(ctx context.Context, input io.Reader, baseURL *n
 			if err == errSkippedURL {
 				result = `url("` + cssURL + `")`
 			} else {
-				result = `url("` + createDataURL(content, contentType) + `")`
+				result = `url("` + arc.transform(cssURL, content, contentType) + `")`
 			}
 
 			mutex.Lock()

@@ -10,39 +10,63 @@ import (
 
 	"github.com/go-shiori/dom"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 	"golang.org/x/sync/errgroup"
 )
 
 var (
-	rxLazyImageSrc    = regexp.MustCompile(`(?i)^\s*\S+\.(jpg|jpeg|png|webp|gif)\S*\s*$`)
-	rxLazyImageSrcset = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp|gif)\s+\d`)
-	rxImgExtensions   = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|webp|gif)`)
+	rxLazyImageSrc    = regexp.MustCompile(`(?i)^\s*\S+(jpg|jpeg|png|webp|gif)\S*\s*$`)
+	rxLazyImageSrcset = regexp.MustCompile(`(?i)(jpg|jpeg|png|webp|gif)\s+\d`)
+	rxImgExtensions   = regexp.MustCompile(`(?i)(jpg|jpeg|png|webp|gif)`)
 	rxSrcsetURL       = regexp.MustCompile(`(?i)(\S+)(\s+[\d.]+[xw])?(\s*(?:,|$))`)
 	rxB64DataURL      = regexp.MustCompile(`(?i)^data:\s*([^\s;,]+)\s*;\s*base64\s*`)
 )
 
-func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL) (string, error) {
+//nolint:gocyclo,goconst
+func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *nurl.URL, isFragment bool) (string, error) {
 	// Parse input into HTML document
-	doc, err := html.Parse(input)
+	var doc *html.Node
+	var err error
+	if !isFragment {
+		doc, err = html.Parse(input)
+	} else {
+		doc = &html.Node{
+			Type:     html.ElementNode,
+			Data:     "body",
+			DataAtom: atom.Body,
+		}
+		var fragments []*html.Node
+		fragments, err = html.ParseFragment(input, doc)
+		for _, node := range fragments {
+			doc.AppendChild(node)
+		}
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to parse HTML: %w", err)
 	}
 
-	// Prepare documents by doing these steps :
-	// - Set Content-Security-Policy to make sure no unwanted request happened
-	// - Apply configuration to documents
-	// - Replace all noscript to divs, to make it processed as well
-	// - Remove all comments in documents
-	// - Convert data-src and data-srcset attribute in lazy image to src and srcset
-	// - Convert relative URL into absolute URL
-	// - Remove subresources integrity attribute from links
-	arc.setContentSecurityPolicy(doc)
-	arc.applyConfiguration(doc)
-	arc.convertNoScriptToDiv(doc, true)
-	arc.removeComments(doc)
-	arc.convertLazyImageAttrs(doc)
-	arc.convertRelativeURLs(doc, baseURL)
-	arc.removeLinkIntegrityAttr(doc)
+	if !isFragment {
+		// Prepare documents by doing these steps :
+		// - Set Content-Security-Policy to make sure no unwanted Request happened
+		// - append source URL into head
+		// - Add charset meta into head
+		// - Apply configuration to documents
+		// - Replace all noscript to divs, to make it processed as well
+		// - Remove all comments in documents
+		// - Convert data-src and data-srcset attribute in lazy image to src and srcset
+		// - Convert relative URL into absolute URL
+		// - Remove subresources integrity attribute from links
+		arc.setContentSecurityPolicy(doc)
+		arc.setSourceURL(doc, baseURL)
+		arc.addMeta(doc)
+		arc.applyConfiguration(doc)
+		arc.convertNoScriptToDiv(doc, true)
+		arc.removeComments(doc)
+		arc.convertLazyImageAttrs(doc)
+		arc.convertRelativeURLs(doc, baseURL)
+		arc.removeLinkIntegrityAttr(doc)
+		arc.appendTitle(doc)
+	}
 
 	// Find all nodes which might has subresource.
 	// A node might has subresource if it fulfills one of these criteria :
@@ -94,6 +118,8 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 				return arc.processEmbedNode(ctx, node, baseURL)
 			case "img", "picture", "figure", "video", "audio", "source":
 				return arc.processMediaNode(ctx, node, baseURL)
+			case "template":
+				return arc.processTemplateNode(ctx, node, baseURL)
 			default:
 				return nil
 			}
@@ -109,11 +135,14 @@ func (arc *Archiver) processHTML(ctx context.Context, input io.Reader, baseURL *
 	arc.revertConvertedNoScript(doc)
 
 	// Convert document back to string
-	docHTML := dom.OuterHTML(doc)
-	return docHTML, nil
+	if isFragment {
+		return dom.InnerHTML(doc), nil
+	} else {
+		return dom.OuterHTML(doc), nil
+	}
 }
 
-// setContentSecurityPolicy prevent browsers from requesting any remote
+// setContentSecurityPolicy prevent browsers from Requesting any remote
 // resources by setting Content-Security-Policy to only allow from
 // inline element and data URL.
 func (arc *Archiver) setContentSecurityPolicy(doc *html.Node) {
@@ -127,7 +156,7 @@ func (arc *Archiver) setContentSecurityPolicy(doc *html.Node) {
 
 	// Prepare list of CSP
 	policies := []string{
-		"default-src 'unsafe-inline' data:;",
+		"default-src 'unsafe-inline' 'self' data:;",
 		"connect-src 'none';",
 	}
 
@@ -164,6 +193,31 @@ func (arc *Archiver) setContentSecurityPolicy(doc *html.Node) {
 	}
 }
 
+// set original URL into head meta
+func (arc *Archiver) setSourceURL(doc *html.Node, baseURL *nurl.URL) {
+	// Put the URL to head
+	heads := dom.GetElementsByTagName(doc, "head")
+	meta := dom.CreateElement("meta")
+	dom.SetAttribute(meta, "property", "source:url")
+	dom.SetAttribute(meta, "content", baseURL.String())
+	dom.PrependChild(heads[0], meta)
+}
+
+// add head meta
+func (arc *Archiver) addMeta(doc *html.Node) {
+	for _, meta := range dom.GetElementsByTagName(doc, "meta") {
+		charset := dom.GetAttribute(meta, "charset")
+		if charset != "" {
+			return
+		}
+	}
+
+	heads := dom.GetElementsByTagName(doc, "head")
+	meta := dom.CreateElement("meta")
+	dom.SetAttribute(meta, "charset", "utf-8")
+	dom.PrependChild(heads[0], meta)
+}
+
 // applyConfiguration removes or replace elements following the configuration.
 func (arc *Archiver) applyConfiguration(doc *html.Node) {
 	if arc.DisableJS {
@@ -174,7 +228,8 @@ func (arc *Archiver) applyConfiguration(doc *html.Node) {
 		// Remove links with javascript URL scheme
 		for _, a := range dom.GetElementsByTagName(doc, "a") {
 			href := dom.GetAttribute(a, "href")
-			if strings.HasPrefix(href, "javascript:") {
+			u, err := nurl.Parse(href)
+			if err != nil || u.Scheme == "javascript" || u.Scheme == "data" || u.Scheme == "vbscript" {
 				dom.SetAttribute(a, "href", "#")
 			}
 		}
@@ -238,6 +293,7 @@ func (arc *Archiver) convertNoScriptToDiv(doc *html.Node, markNewDiv bool) {
 // convertLazyImageAttrs convert attributes data-src and data-srcset
 // which often found in lazy-loaded images and pictures, into basic attribute
 // src and srcset, so images that can be loaded without JS.
+//nolint:gocyclo,goconst
 func (arc *Archiver) convertLazyImageAttrs(doc *html.Node) {
 	imageNodes := dom.GetAllNodesWithTag(doc, "img", "picture", "figure")
 	dom.ForEachNode(imageNodes, func(elem *html.Node, _ int) {
@@ -380,6 +436,32 @@ func (arc *Archiver) removeLinkIntegrityAttr(doc *html.Node) {
 	}
 }
 
+// appendTitle extract og:title and append to title tag if it don't exists.
+func (arc *Archiver) appendTitle(doc *html.Node) {
+	title := dom.QuerySelector(doc, "title")
+	if title != nil {
+		if dom.InnerText(title) != "" {
+			return
+		}
+	}
+	ogTitle := dom.QuerySelector(doc, "meta[property='og:title']")
+	if ogTitle == nil {
+		return
+	}
+
+	// Find the head, create it if necessary
+	heads := dom.GetElementsByTagName(doc, "head")
+	if len(heads) == 0 {
+		newHead := dom.CreateElement("head")
+		dom.PrependChild(doc, newHead)
+		heads = []*html.Node{newHead}
+	}
+
+	title = dom.CreateElement("title")
+	dom.SetTextContent(title, dom.GetAttribute(ogTitle, "content"))
+	dom.PrependChild(heads[0], title)
+}
+
 // removeComments find all comments in document then remove it.
 func (arc *Archiver) removeComments(doc *html.Node) {
 	// Find all comments
@@ -417,7 +499,7 @@ func (arc *Archiver) processURLNode(ctx context.Context, node *html.Node, attrNa
 
 	newURL := url
 	if err == nil {
-		newURL = createDataURL(content, contentType)
+		newURL = arc.transform(url, content, contentType)
 	}
 
 	dom.SetAttribute(node, attrName, newURL)
@@ -454,7 +536,7 @@ func (arc *Archiver) processLinkNode(ctx context.Context, node *html.Node, baseU
 	}
 
 	url := dom.GetAttribute(node, "href")
-	content, _, err := arc.processURL(ctx, url, baseURL.String())
+	content, contentType, err := arc.processURL(ctx, url, baseURL.String())
 	if err != nil {
 		if err == errSkippedURL {
 			return nil
@@ -462,25 +544,44 @@ func (arc *Archiver) processLinkNode(ctx context.Context, node *html.Node, baseU
 		return err
 	}
 
-	// Remove all attributes for this node
-	for i := len(node.Attr) - 1; i >= 0; i-- {
-		dom.RemoveAttribute(node, node.Attr[i].Key)
-	}
+	if arc.WrapDirectory != "" {
+		newSrc := arc.transform(url, content, contentType)
+		dom.SetAttribute(node, "href", newSrc)
+	} else {
+		// Remove all attributes for this node
+		for i := len(node.Attr) - 1; i >= 0; i-- {
+			dom.RemoveAttribute(node, node.Attr[i].Key)
+		}
 
-	// Convert <link> into <style>
-	node.Data = "style"
-	dom.SetAttribute(node, "type", "text/css")
-	dom.SetTextContent(node, string(content))
+		// Convert <link> into <style>
+		node.Data = "style"
+		dom.SetAttribute(node, "type", "text/css")
+		dom.SetTextContent(node, b2s(content))
+	}
+	return nil
+}
+
+func (arc *Archiver) processTemplateNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+	result, err := arc.processHTML(ctx, strings.NewReader(dom.TextContent(node)), baseURL, true)
+	if err != nil {
+		return err
+	}
+	dom.SetTextContent(node, result)
 	return nil
 }
 
 func (arc *Archiver) processScriptNode(ctx context.Context, node *html.Node, baseURL *nurl.URL) error {
+	if dom.GetAttribute(node, "type") == "text/template" {
+		if err := arc.processTemplateNode(ctx, node, baseURL); err != nil {
+			return err
+		}
+	}
 	if !dom.HasAttribute(node, "src") {
 		return nil
 	}
 
 	url := dom.GetAttribute(node, "src")
-	content, _, err := arc.processURL(ctx, url, baseURL.String())
+	content, contentType, err := arc.processURL(ctx, url, baseURL.String())
 	if err != nil {
 		if err == errSkippedURL {
 			return nil
@@ -488,8 +589,13 @@ func (arc *Archiver) processScriptNode(ctx context.Context, node *html.Node, bas
 		return err
 	}
 
-	dom.RemoveAttribute(node, "src")
-	dom.SetTextContent(node, string(content))
+	if arc.WrapDirectory != "" {
+		newSrc := arc.transform(url, content, contentType)
+		dom.SetAttribute(node, "src", newSrc)
+	} else {
+		dom.RemoveAttribute(node, "src")
+		dom.SetTextContent(node, b2s(content))
+	}
 	return nil
 }
 
@@ -511,7 +617,7 @@ func (arc *Archiver) processEmbedNode(ctx context.Context, node *html.Node, base
 
 	newURL := url
 	if err == nil {
-		newURL = createDataURL(content, contentType)
+		newURL = arc.transform(url, content, contentType)
 	}
 
 	dom.SetAttribute(node, attrName, newURL)
@@ -546,7 +652,7 @@ func (arc *Archiver) processMediaNode(ctx context.Context, node *html.Node, base
 
 		newSet := oldURL
 		if err == nil {
-			newSet = createDataURL(content, contentType)
+			newSet = arc.transform(oldURL, content, contentType)
 		}
 
 		newSet += targetWidth
