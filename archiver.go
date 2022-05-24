@@ -183,7 +183,7 @@ func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response,
 	op := func() error {
 		var err error
 		resp, err = arc.httpClient.Do(req) //nolint:bodyclose,goimports
-		if err == nil && resp != nil && resp.StatusCode >= 300 {
+		if err == nil && (resp.StatusCode >= http.StatusInternalServerError || resp.StatusCode == http.StatusTooManyRequests) {
 			err = fmt.Errorf("failed to fetch with status code: %d", resp.StatusCode)
 		}
 		return err
