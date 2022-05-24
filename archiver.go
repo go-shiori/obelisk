@@ -20,6 +20,7 @@ import (
 
 var (
 	defaultUserAgent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0"
+	maxElapsedTime   = 30 * time.Second
 )
 
 // Request is data of archival request.
@@ -55,6 +56,7 @@ type Archiver struct {
 
 	Transport             http.RoundTripper
 	RequestTimeout        time.Duration
+	MaxRetries            int
 	MaxConcurrentDownload int64
 	SkipResourceURLError  bool
 	WrapDirectory         string // directory to stores resources
@@ -181,14 +183,14 @@ func (arc *Archiver) downloadFile(url string, parentURL string) (*http.Response,
 	op := func() error {
 		var err error
 		resp, err = arc.httpClient.Do(req) //nolint:bodyclose,goimports
-		if err == nil && resp != nil && resp.StatusCode > 200 {
+		if err == nil && (resp.StatusCode >= http.StatusInternalServerError || resp.StatusCode == http.StatusTooManyRequests) {
 			err = fmt.Errorf("failed to fetch with status code: %d", resp.StatusCode)
 		}
 		return err
 	}
 	exp := backoff.NewExponentialBackOff()
-	exp.MaxElapsedTime = 5 * time.Minute
-	bo := backoff.WithMaxRetries(exp, 10)
+	exp.MaxElapsedTime = maxElapsedTime
+	bo := backoff.WithMaxRetries(exp, uint64(arc.MaxRetries))
 	err = backoff.Retry(op, bo)
 
 	return resp, err

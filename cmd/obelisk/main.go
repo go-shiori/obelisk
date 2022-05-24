@@ -45,6 +45,7 @@ func main() {
 	cmd.Flags().Bool("no-embeds", false, "remove embedded elements (e.g iframe)")
 	cmd.Flags().Bool("no-medias", false, "remove media elements (e.g img, audio)")
 
+	cmd.Flags().IntP("retries", "r", 3, "maximum number of retries for single request")
 	cmd.Flags().IntP("timeout", "t", 60, "maximum time (in second) before request timeout")
 	cmd.Flags().Bool("insecure", false, "skip X.509 (TLS) certificate verification")
 	cmd.Flags().Int64("max-concurrent-download", 10, "max concurrent download at a time")
@@ -74,6 +75,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 	disableEmbeds, _ := cmd.Flags().GetBool("no-embeds")
 	disableMedias, _ := cmd.Flags().GetBool("no-medias")
 
+	retries, _ := cmd.Flags().GetInt("retries")
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	skipTLSVerification, _ := cmd.Flags().GetBool("insecure")
 	maxConcurrentDownload, _ := cmd.Flags().GetInt64("max-concurrent-download")
@@ -154,6 +156,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		DisableMedias: disableMedias,
 
 		Transport:             transport,
+		MaxRetries:            retries,
 		RequestTimeout:        time.Duration(timeout) * time.Second,
 		MaxConcurrentDownload: maxConcurrentDownload,
 		SkipResourceURLError:  skipResourceURLError,
