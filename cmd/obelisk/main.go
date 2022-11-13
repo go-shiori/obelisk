@@ -193,7 +193,6 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 
 			req := obelisk.Request{
 				URL:     url.String(),
-				Cookies: reqCookies,
 			}
 
 			// Start archival
