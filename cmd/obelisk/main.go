@@ -192,7 +192,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 			}
 
 			req := obelisk.Request{
-				URL:     url.String(),
+				URL: url.String(),
 			}
 
 			// Start archival

@@ -314,6 +314,7 @@ func (arc *Archiver) convertNoScriptToDiv(doc *html.Node, markNewDiv bool) {
 // convertLazyImageAttrs convert attributes data-src and data-srcset
 // which often found in lazy-loaded images and pictures, into basic attribute
 // src and srcset, so images that can be loaded without JS.
+//
 //nolint:gocyclo,goconst
 func (arc *Archiver) convertLazyImageAttrs(doc *html.Node) {
 	imageNodes := dom.GetAllNodesWithTag(doc, "img", "picture", "figure")
