@@ -201,7 +201,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 				logrus.Printf("archival started for %s\n", request.URL)
 			}
 
-			result, contentType, err := archiver.Archive(context.Background(), req)
+			result, contentType, err := archiver.WithCookies(reqCookies).Archive(context.Background(), req)
 			if err != nil {
 				return err
 			}
