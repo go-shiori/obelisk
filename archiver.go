@@ -25,8 +25,10 @@ var (
 
 // Request is data of archival request.
 type Request struct {
-	Input   io.Reader
-	URL     string
+	Input io.Reader
+	URL   string
+
+	// Deprecated: Use `Archiver.WithCookies` instead.
 	Cookies []*http.Cookie
 
 	origin *nurl.URL // The original URL request was based from the input. If there are no redirects, it should be the same as `URL`.
@@ -145,6 +147,12 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	}
 
 	return s2b(result), contentType, nil
+}
+
+// WithCookies attach request cookies to `Archiver`.
+func (arc *Archiver) WithCookies(cookies []*http.Cookie) *Archiver {
+	arc.cookies = cookies
+	return arc
 }
 
 // finalURI returns the final URL that has been redirected to another URL.
