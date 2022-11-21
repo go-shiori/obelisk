@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/cenkalti/backoff/v4 v4.1.2
+	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/go-shiori/dom v0.0.0-20210627111528-4e4722cd0d65
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
 	github.com/kennygrant/sanitize v1.2.4
