@@ -10,13 +10,11 @@ require (
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.1
 	github.com/spf13/cobra v1.4.0
-	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/tdewolff/parse/v2 v2.5.27
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
