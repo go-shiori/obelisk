@@ -22,24 +22,7 @@ issues:
       - gosec
       - goconst
 linters:
-  disable-all: true
-  enable:
-    - gosec
-    - unconvert
-    - gocyclo
-    - goconst
-    - goimports
-    - gocritic
-    - bodyclose
-    - misspell
-    - rowserrcheck
-    - structcheck
-    - stylecheck
-    - typecheck
-    - varcheck
-    - unconvert
-    - unparam
-    - whitespace
+  disable-all: false
 linters-settings:
   errcheck:
     # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`;
@@ -69,7 +52,7 @@ linters-settings:
     ignore-words:
       - someword
   stylecheck:
-    go: "1.16"
+    go: "1.20"
     # https://staticcheck.io/docs/options#checks
     checks: [ "all", "-ST1003", "-ST1008", "-ST1016" ]
     # https://staticcheck.io/docs/options#initialisms
