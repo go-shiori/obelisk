@@ -13,106 +13,19 @@ permissions: write-all
 
 jobs:
   lint:
+  golangci:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
+      - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac #v4.0.0
+      - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe #v4.1.0
         with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Lint Code Base
-        uses: github/super-linter@v4
-        env:
-          DEFAULT_BRANCH: 'main'
-          VALIDATE_MARKDOWN: true
-          VALIDATE_DOCKERFILE: true
-          VALIDATE_BASH: true
-          VALIDATE_BASH_EXEC: true
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  go:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Golang linter
+          go-version-file: go.mod
+          cache: false
+      - name: golangci-lint
         uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc #v3.7.0
-
-  shellcheck:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
         with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run shellcheck with reviewdog
-        uses: reviewdog/action-shellcheck@v1
-
-  misspell:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run misspell with reviewdog
-        uses: reviewdog/action-misspell@v1
-
-  alex:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run alex with reviewdog
-        uses: reviewdog/action-alex@v1
+          version: latest
+          only-new-issues: true
 
   goreportcard:
     if: ${{ github.ref == 'refs/heads/main' }}
