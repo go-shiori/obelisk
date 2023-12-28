@@ -2,17 +2,13 @@ name: Linter
 
 on:
   push:
-    branches:
-      - '**'
+    branches: [ master ]
   pull_request:
-    branches:
-      - '**'
-    types: [ opened, synchronize, reopened ]
+    branches: [ master ]
 
-permissions: write-all
+permissions: read
 
 jobs:
-  lint:
   golangci:
     runs-on: ubuntu-latest
     steps:
