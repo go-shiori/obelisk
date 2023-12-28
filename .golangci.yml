@@ -22,7 +22,23 @@ issues:
       - gosec
       - goconst
 linters:
-  disable-all: false
+  disable-all: true
+  enable:
+    - gosec
+    - unconvert
+    - gocyclo
+    - goconst
+    - goimports
+    - gocritic
+    - bodyclose
+    - misspell
+    - rowserrcheck
+    - unused
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - whitespace
 linters-settings:
   errcheck:
     # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`;
