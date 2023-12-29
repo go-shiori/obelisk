@@ -58,3 +58,41 @@ func TestIsValitdURL(t *testing.T) {
 		assert.Equal(t, "TextforTest", result)
 	})
 }
+
+func TestSanitizeStyleURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Test with url()",
+			input:    "url('https://example.com/')",
+			expected: "https://example.com/",
+		},
+		{
+			name:     "Test with double quotes",
+			input:    "\"https://example.com/\"",
+			expected: "https://example.com/",
+		},
+		{
+			name:     "Test with single quotes",
+			input:    "'https://example.com/'",
+			expected: "https://example.com/",
+		},
+		{
+			name:     "Test with no quotes",
+			input:    "https://example.com/",
+			expected: "https://example.com/",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := sanitizeStyleURL(test.input)
+			if result != test.expected {
+				t.Errorf("Expected %s, but got %s", test.expected, result)
+			}
+		})
+	}
+}
