@@ -3,10 +3,14 @@ package obelisk
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func servefiles() {
+}
 
 func TestArchiver_Validate(t *testing.T) {
 	arc := &Archiver{
@@ -52,6 +56,13 @@ func TestArchiver_Validate(t *testing.T) {
 }
 
 func TestArchiver_Archive(t *testing.T) {
+	fs := http.FileServer(http.Dir("./testdata/"))
+
+	// start a test server with the file server handler
+	server := httptest.NewServer(fs)
+
+	defer server.Close()
+
 	archiver := &Archiver{
 		Cache:                 nil,
 		UserAgent:             "",
@@ -65,7 +76,7 @@ func TestArchiver_Archive(t *testing.T) {
 
 	// Create a mock request
 	req := Request{
-		URL: "https://example.com",
+		URL: server.URL,
 	}
 
 	// Call the Archive method and capture the result
