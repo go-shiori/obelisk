@@ -39,7 +39,7 @@ jobs:
   reviewdog-misspell:
     runs-on: ubuntu-latest
     steps:
-      - name Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
       - name: misspell
         uses: reviewdog/action-misspell@v1
