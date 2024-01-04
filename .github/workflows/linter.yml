@@ -23,6 +23,36 @@ jobs:
           version: latest
           only-new-issues: true
 
+  super-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Super-linter
+        uses: super-linter/super-linter@v5.7.2
+        env:
+          DEFAULT_BRANCH: 'main'
+          VALIDATE_MARKDOWN: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  reviewdog-misspell:
+    runs-on: ubuntu-latest
+    steps:
+      - name Checkout code
+        uses: actions/checkout@v4
+      - name: misspell
+        uses: reviewdog/action-misspell@v1
+        with:
+          github_token: ${{ secrets.github_token }}
+          locale: "US"
+
+  reviewdog-alex:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: reviewdog/action-alex@v1
+
   goreportcard:
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
