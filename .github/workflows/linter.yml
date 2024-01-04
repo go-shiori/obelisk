@@ -23,7 +23,7 @@ jobs:
           version: latest
           only-new-issues: true
 
-  super-linter:
+  super-linter-markdown:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
