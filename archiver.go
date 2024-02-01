@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	nurl "net/url"
 	"os"
@@ -136,7 +135,7 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	// Check the type of the downloaded file.
 	// If it's not HTML, just return it as it is.
 	if !strings.HasPrefix(contentType, "text/html") {
-		content, err := ioutil.ReadAll(req.Input)
+		content, err := io.ReadAll(req.Input)
 		return content, contentType, err
 	}
 
@@ -219,7 +218,7 @@ func (arc *Archiver) transform(uri string, content []byte, contentType string) s
 		path = filepath.Join(arc.WrapDirectory, name)
 	}
 
-	if err := ioutil.WriteFile(path, content, 0600); err != nil {
+	if err := os.WriteFile(path, content, 0600); err != nil {
 		// Fallback to creating data URL
 		if contentType == "" {
 			contentType = http.DetectContentType(content)
