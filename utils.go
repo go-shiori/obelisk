@@ -92,7 +92,7 @@ func createDataURL(content []byte, contentType string) string {
 
 // s2b converts string to a byte slice without memory allocation.
 func s2b(s string) (b []byte) {
-	return []byte(s)
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
 
 // b2s converts byte slice to a string without memory allocation.
