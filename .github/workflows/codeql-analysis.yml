@@ -46,13 +46,13 @@ jobs:
     steps:
     - name: Check out code base
       if: github.event_name == 'push' || github.event_name == 'schedule'
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+      uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 #v4.1.2
       with:
         fetch-depth: 0
 
     - name: Check out code base
       if: github.event_name == 'pull_request'
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+      uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 #v4.1.2
       with:
         fetch-depth: 0
         ref: ${{ github.event.pull_request.head.sha }}
@@ -93,13 +93,13 @@ jobs:
     steps:
     - name: Check out code base
       if: github.event_name == 'push' || github.event_name == 'schedule'
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+      uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 #v4.1.2
       with:
         fetch-depth: 0
 
     - name: Check out code base
       if: github.event_name == 'pull_request'
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+      uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 #v4.1.2
       with:
         fetch-depth: 0
         ref: ${{ github.event.pull_request.head.sha }}
