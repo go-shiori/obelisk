@@ -3,7 +3,7 @@ package obelisk
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	nurl "net/url"
 	"strings"
 
@@ -87,7 +87,7 @@ func (arc *Archiver) processURL(ctx context.Context, url string, parentURL strin
 		}
 
 	default:
-		bodyContent, err = ioutil.ReadAll(resp.Body)
+		bodyContent, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, "", err
 		}

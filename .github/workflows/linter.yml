@@ -2,117 +2,57 @@ name: Linter
 
 on:
   push:
-    branches:
-      - '**'
+    branches: [ master ]
   pull_request:
-    branches:
-      - '**'
-    types: [ opened, synchronize, reopened ]
+    branches: [ master ]
 
-permissions: write-all
+permissions:
+    contents: read
 
 jobs:
-  lint:
+  golangci:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 #v5
         with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
+          go-version-file: go.mod
+          cache: false
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc #v3.7.0
         with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          version: latest
+          only-new-issues: true
 
-      - name: Lint Code Base
-        uses: github/super-linter@v4
+  super-linter-markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+
+      - name: Super-linter
+        uses: super-linter/super-linter@ff5037c06042e564803502feb97f8a686f3b0171 #v6.0.0
         env:
           DEFAULT_BRANCH: 'main'
           VALIDATE_MARKDOWN: true
-          VALIDATE_DOCKERFILE: true
-          VALIDATE_BASH: true
-          VALIDATE_BASH_EXEC: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  go:
+  reviewdog-misspell:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+      - name: misspell
+        uses: reviewdog/action-misspell@06d6a480724fa783c220081bbc22336a78dbbe82 #v1.15.0
         with:
-          fetch-depth: 0
+          github_token: ${{ secrets.github_token }}
+          locale: "US"
 
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Golang linter
-        uses: golangci/golangci-lint-action@v3.1.0
-
-  shellcheck:
+  reviewdog-alex:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run shellcheck with reviewdog
-        uses: reviewdog/action-shellcheck@v1
-
-  misspell:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run misspell with reviewdog
-        uses: reviewdog/action-misspell@v1
-
-  alex:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code base
-        if: github.event_name == 'push'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Check out code base
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run alex with reviewdog
-        uses: reviewdog/action-alex@v1
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+      - uses: reviewdog/action-alex@83d6502258513773127065a4d8d53c2c84697579 #v1.7.0
 
   goreportcard:
     if: ${{ github.ref == 'refs/heads/main' }}
