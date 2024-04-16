@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func servefiles() {
-}
+//func servefiles() {
+//}
 
 func TestArchiver_Validate(t *testing.T) {
 	arc := &Archiver{
