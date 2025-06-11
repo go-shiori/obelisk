@@ -3,6 +3,7 @@ package obelisk
 import (
 	"context"
 	"fmt"
+	"golang.org/x/net/html/charset"
 	"io"
 	"net/http"
 	nurl "net/url"
@@ -139,8 +140,14 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 		return content, contentType, err
 	}
 
+	// Convert input to UTF-8
+	r, err := charset.NewReader(req.Input, contentType)
+	if err != nil {
+		r = req.Input
+	}
+
 	// If it's HTML process it
-	result, err := arc.processHTML(ctx, req.Input, url, false)
+	result, err := arc.processHTML(ctx, r, url, false)
 	if err != nil {
 		return nil, "", err
 	}
