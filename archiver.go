@@ -3,7 +3,6 @@ package obelisk
 import (
 	"context"
 	"fmt"
-	"golang.org/x/net/html/charset"
 	"io"
 	"net/http"
 	nurl "net/url"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/html/charset"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/kennygrant/sanitize"
@@ -144,6 +145,7 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 	r, err := charset.NewReader(req.Input, contentType)
 	if err != nil {
 		r = req.Input
+		arc.logDebug(fmt.Sprintf("charset not supported: %s", contentType))
 	}
 
 	// If it's HTML process it
