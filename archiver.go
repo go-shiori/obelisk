@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/html/charset"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/kennygrant/sanitize"
 	"golang.org/x/sync/semaphore"
@@ -139,8 +141,15 @@ func (arc *Archiver) Archive(ctx context.Context, req Request) ([]byte, string, 
 		return content, contentType, err
 	}
 
+	// Convert input to UTF-8
+	r, err := charset.NewReader(req.Input, contentType)
+	if err != nil {
+		r = req.Input
+		arc.logDebug(fmt.Sprintf("charset not supported: %s", contentType))
+	}
+
 	// If it's HTML process it
-	result, err := arc.processHTML(ctx, req.Input, url, false)
+	result, err := arc.processHTML(ctx, r, url, false)
 	if err != nil {
 		return nil, "", err
 	}

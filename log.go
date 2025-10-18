@@ -19,3 +19,10 @@ func (arc *Archiver) logURL(url, parentURL string, isCached bool) {
 
 	logrus.WithFields(fields).Println(url)
 }
+
+func (arc *Archiver) logDebug(msg string) {
+	if !arc.EnableLog {
+		return
+	}
+	logrus.Debug(msg)
+}
