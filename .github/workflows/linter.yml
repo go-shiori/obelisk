@@ -13,13 +13,13 @@ jobs:
   golangci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 #v5
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 #v6.0.0
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c #v5
         with:
           go-version-file: go.mod
           cache: false
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@aaa42aa0628b4ae2578232a66b541047968fac86 #v6.1.0
+        uses: golangci/golangci-lint-action@e7fa5ac41e1cf5b7d48e45e42232ce7ada589601 #v9.1.0
         with:
           version: latest
           only-new-issues: true
@@ -28,10 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 #v6.0.0
 
       - name: Super-linter
-        uses: super-linter/super-linter@b92721f792f381cedc002ecdbb9847a15ece5bb8 #v7.1.0
+        uses: super-linter/super-linter@2bdd90ed3262e023ac84bf8fe35dc480721fc1f2 #v8.2.1
         env:
           DEFAULT_BRANCH: 'main'
           VALIDATE_MARKDOWN: true
@@ -41,9 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 #v6.0.0
       - name: misspell
-        uses: reviewdog/action-misspell@ef8b22c1cca06c8d306fc6be302c3dab0f6ca12f #v1.23.0
+        uses: reviewdog/action-misspell@d6429416b12b09b4e2768307d53bef58d172e962 #v1.27.0
         with:
           github_token: ${{ secrets.github_token }}
           locale: "US"
@@ -51,8 +51,8 @@ jobs:
   reviewdog-alex:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
-      - uses: reviewdog/action-alex@f95df9e356d97e67e4626f04ad125c4a99a906a9 #v1.13.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 #v6.0.0
+      - uses: reviewdog/action-alex@6083b8ca333981fa617c6828c5d8fb21b13d916b #v1.16.0
 
   goreportcard:
     if: ${{ github.ref == 'refs/heads/main' }}
