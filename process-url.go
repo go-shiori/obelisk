@@ -66,7 +66,7 @@ func (arc *Archiver) processURL(ctx context.Context, url string, parentURL strin
 	}
 
 	// Read content of response body. If the downloaded file is HTML
-	// or CSS it need to be processed again
+	// or CSS it needs to be processed again
 	var bodyContent []byte
 
 	switch {

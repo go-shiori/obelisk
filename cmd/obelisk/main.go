@@ -42,13 +42,13 @@ func main() {
 
 	cmd.Flags().Bool("no-js", false, "disable JavaScript")
 	cmd.Flags().Bool("no-css", false, "disable CSS styling")
-	cmd.Flags().Bool("no-embeds", false, "remove embedded elements (e.g iframe)")
-	cmd.Flags().Bool("no-medias", false, "remove media elements (e.g img, audio)")
+	cmd.Flags().Bool("no-embeds", false, "remove embedded elements (e.g. iframe)")
+	cmd.Flags().Bool("no-medias", false, "remove media elements (e.g. img, audio)")
 
 	cmd.Flags().IntP("retries", "r", 3, "maximum number of retries for single request")
-	cmd.Flags().IntP("timeout", "t", 60, "maximum time (in second) before request timeout")
+	cmd.Flags().IntP("timeout", "t", 60, "maximum time (in seconds) before request timeout")
 	cmd.Flags().Bool("insecure", false, "skip X.509 (TLS) certificate verification")
-	cmd.Flags().Int64("max-concurrent-download", 10, "max concurrent download at a time")
+	cmd.Flags().Int64("max-concurrent-download", 10, "max concurrent downloads at a time")
 	cmd.Flags().Bool("skip-resource-url-error", false, "skip process resource url error")
 
 	// Execute
@@ -98,7 +98,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		_ = os.MkdirAll(outputDir, os.ModePerm)
 	}
 
-	// Create initial list of archival request
+	// Create initial list of archival requests
 	var err error
 	requests := []archiveRequest{}
 	for _, arg := range args {
@@ -114,7 +114,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 		requests = append(requests, requestsFromFile...)
 	}
 
-	// Depending of requests count, there are some thing to do
+	// Depending on requests count, there are some things to do
 	switch len(requests) {
 	case 0:
 		return fmt.Errorf("no url to process")
@@ -176,7 +176,7 @@ func cmdHandler(cmd *cobra.Command, args []string) error {
 			// Validate URL
 			url, err := nurl.ParseRequestURI(request.URL)
 			if err != nil || url.Scheme == "" || url.Hostname() == "" {
-				logrus.Warnf("%s is not valid URL\n", request.URL)
+				logrus.Warnf("%s is not a valid URL\n", request.URL)
 				return nil
 			}
 

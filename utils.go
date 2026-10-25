@@ -19,7 +19,7 @@ func isValidURL(s string) bool {
 	return err == nil
 }
 
-// createAbsoluteURL convert url to absolute path based on base.
+// createAbsoluteURL converts url to absolute path based on base.
 func createAbsoluteURL(url string, base *nurl.URL) string {
 	url = strings.TrimSpace(url)
 	if url == "" || base == nil {

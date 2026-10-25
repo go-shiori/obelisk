@@ -24,7 +24,7 @@ var (
 	maxElapsedTime   = 30 * time.Second
 )
 
-// Request is data of archival request.
+// Request is the data of an archival request.
 type Request struct {
 	Input io.Reader
 	URL   string
@@ -35,13 +35,13 @@ type Request struct {
 	origin *nurl.URL // The original URL request was based from the input. If there are no redirects, it should be the same as `URL`.
 }
 
-// Asset is asset that used in a web page.
+// Asset is an asset that is used in a web page.
 type Asset struct {
 	Data        []byte
 	ContentType string
 }
 
-// Archiver is the core of obelisk, which used to download a
+// Archiver is the core of obelisk, which is used to download a
 // web page then embeds its assets.
 type Archiver struct {
 	sync.RWMutex
